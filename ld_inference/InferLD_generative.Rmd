@@ -3,4 +3,113 @@ title: "InferLD"
 output: html_document
 ---
 
-This notebook will include 
+This notebook will run the generative model of LD inference
+We want to generate with 100 SNPs and 10000 reference haplotypes GWAS summary statistics under high and low Fst and under high and low values of noise
+```{r Graphing Functions}
+library(data.table)
+library(plotly)
+source("/well/mcvean/mtutert/thesis_code/thesis_code/ld_inference/InferLD/R/HMM_Functions.R")
+source("/well/mcvean/mtutert/thesis_code/thesis_code/ld_inference/InferLD/R/validation_pipeline_functions.R")
+
+#Output the r2 (AFs)
+af_r2_across_samples = function(inference_weights, #The result of InferLD
+                                gwas_af)           #GWAS Allele Frequencies
+{
+  inferred_af = inference_weights$inferred_af_given_weights
+  #Each at time point, we need to plot the r2, this requires the gwas_af
+  r2_across_samples = c()
+  for (i in 1:ncol(inferred_af)) {
+    r2_across_samples[i] = summary(lm(gwas_af~inferred_af[,i]))$r.squared
+  }
+  fig <- plot_ly(data = iris, x = ~seq(1:ncol(inferred_af)), y = ~r2_across_samples)
+  fig = fig %>% layout(title="Accuracy of AF Inference Across Sample Updates", xaxis = list(title = "Update Number"), yaxis = list(title = "Correlation between Inferred AF and GWAS AF"))
+
+  return(fig)
+}
+
+ld_r2_across_samples = function(inference_weights,W_true_star,reference_haplotype_panel)
+{
+  #Calculate the true GWAS LD
+  gwas_ld = cov.wt(x = reference_haplotype_panel, wt = W_true_star[,1]/sum(W_true_star[,1]) ,cor = T)$cor
+  #Get the inferred LD at each time point
+  r2_across_samples = c()
+  for (i in 1:ncol(inference_weights$inferred_af_given_weights)) {
+    #Get the normalization of the weights
+    wts_norm             = inference_weights$Gibbs_Array[,i]/sum(inference_weights$Gibbs_Array[,i])
+    inferred_ld          = cov.wt(x = reference_haplotype_panel, wt = wts_norm ,cor = T)$cor
+    r2_across_samples[i] = summary(lm(c(gwas_ld)~c(inferred_ld)))$r.squared
+  }
+  fig = plot_ly(data = iris, x = ~seq(1:ncol(inference_weights$inferred_af_given_weights)), y = ~r2_across_samples)
+  fig = fig %>% layout(title="Accuracy of LD Inference Across Sample Updates", xaxis = list(title = "Update Number"), yaxis = list(title = "Correlation between Inferred LD and GWAS LD"))
+  return(fig)
+}
+
+log_likelihood_across_samples = function(inference_weights)
+{
+  likelihood = inference_weights$log_likelihood
+  fig = plot_ly(data = iris, x = ~seq(1:length(likelihood)), y = ~likelihood)
+  fig = fig %>% layout(title="Log Likelihood Across Sample Updates", xaxis = list(title = "Update Number"), yaxis = list(title = "Log Likelihood"))
+  return(fig)
+}
+```
+
+```{r}
+#Generative model
+generative_model = function(fst,
+                            noise,
+                            nstates){
+  #Read in the 1000G reference panel (from ld_inference directory)
+  reference_haplotype_panel = as.matrix((fread("ref_hap_panel", header = F)))
+  reference_haplotype_panel = reference_haplotype_panel[,2:ncol(reference_haplotype_panel)]
+  #Read in functions needed to perform the LD inference
+  #Load in the InferLD functions I need (double check its up to date!)
+  nsnps       = ncol(reference_haplotype_panel)
+  nhaps_ref   = nrow(reference_haplotype_panel)
+  nstates     = nstates 
+  fst         = fst
+  nhaps_gwas  = 10000
+  #Generate the gamma weight prior set of weights
+  weight_prior_set =  gamma_quantiled_weights =  qgamma(p     = (1:nstates) / (1 + nstates), shape = 1 / ( nhaps_ref * ( fst / (1-fst))),scale = ( nhaps_ref * (fst/(1-fst))))
+  weight_prior_set = weight_prior_set[is.finite(weight_prior_set) & weight_prior_set > 0 ]
+  #Sample from weight prior
+  sampled_weights = sample(x = weight_prior_set, size = nhaps_ref, replace = T)
+  #Generate weights across reference panel
+  W_true      = replicate(nsnps,sampled_weights)
+  W_true_star = W_true / t(replicate(nrow(W_true), colSums(W_true)))
+
+  #Convert to GWAS AFs
+  gwas_af       = colSums(W_true_star * reference_haplotype_panel)
+  #case-control constant
+  phi           = 0.5
+  mbar          = 2*phi*(1-phi)*nhaps_gwas
+  #Convert to GWAS sigma^2
+  gwas_sigma_2_true = 1/(mbar*gwas_af*(1-gwas_af))
+  #Convert to noisy GWAS
+  kappa = 4*(gwas_af*(1-gwas_af))
+  gwas_sigma_2_noisy = gwas_sigma_2_true*rgamma(length(gwas_sigma_2_true),shape = noise*kappa ,rate = noise*kappa) #This is what gets read into InferLD
+  return(list(gwas_sigma_2_noisy,gwas_af,W_true_star[,1]))
+}
+```
+
+
+```{r}
+generative_model_results = generative_model(fst = 0.1,noise = 1e4,nstates = 100)
+#Run the inference
+results                             = LD_from_GSHMM(ref_allele_matrix     = reference_haplotype_panel,
+                                                    fst                   = 0.05,
+                                                    alpha                 = 1e4,
+                                                    nSamples              = 2,
+                                                    weights_resolution    = 100,
+                                                    likelihood_toggle     = TRUE,
+                                                    gwas_variance         = generative_model_results[[1]],
+                                                    LD_Infer              = FALSE,
+                                                    recombination         = FALSE,
+                                                    case_control_constant = mbar/2,
+                                                    BurnIn                = 0.9,
+                                                    debug                 = TRUE)
+#Get the figures
+log_likelihood_across_samples(inference_weights = results)
+af_r2_across_samples(inference_weights = results,gwas_af = generative_model_results[[2]])
+ld_r2_across_samples(inference_weights = results,W_true_star = generative_model_results[[3]],reference_haplotype_panel = reference_haplotype_panel)
+```
+
