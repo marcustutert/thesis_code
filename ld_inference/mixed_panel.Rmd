@@ -1,0 +1,354 @@
+---
+title: "InferLD"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This will take the results from the chains on the cluster and output all the visualizations that I could possibly care about here. Later I could throw this together in a function once we've decided what I actually care baout
+
+We will do the graphs across the different reference panels, and the 
+```{r Read in Data}
+#Read in the data across reference panels and across chains
+populations         = list("EUR","AFR",c("EUR_AFR"))
+regions             = seq(1,221)
+
+EUR_results     = readRDS("results/inference_EUR_panel_region_1_chain_1")
+AFR_results     = readRDS("results/inference_AFR_panel_region_1_chain_1")
+EUR_AFR_results = readRDS("results/inference_EUR_AFR_panel_region_1_chain_1")
+results_across_pops = list(EUR_results,AFR_results,EUR_AFR_results)
+names(results_across_pops) = c("EUR","AFR","EUR_AFR")
+max(results_across_pops$EUR$log_likelihood)
+```
+
+Now let's do that table that Robbie is very keen to look at
+```{r}
+#Each row in this table will have either the max likelihood, the theoretical max, the r2 (inferred and with-held SNPs), and the weighted ancestry proportions. The last 3 values will be calculate across the last 90% of the data
+#The remaining figures will be done by averaging across the chains and then calculating the SEs of the data which I will add in
+
+#Do this with the 1000 weight states case, which is the multiple of 3,6,9 in the results file
+
+#####Start with max likelihood (inferred)#####
+nChains = 5
+max_value = c()
+counter = 1
+for (i in 1:(length(populations))) {
+  for (j in 1:nChains) {
+      print(i*3+1)
+      max_value[counter] = max(results[[i*3]][[j]]$log_likelihood)
+      counter = counter + 1
+  }
+}
+
+#Get the average and sd across the max likelihoods
+avg_EUR     = mean(max_value[1:5]) 
+avg_AFR     = mean(max_value[6:10]) 
+avg_EUR_AFR = mean(max_value[11:15]) 
+
+sd_EUR     = sd(max_value[1:5]) 
+sd_AFR     = sd(max_value[6:10]) 
+sd_EUR_AFR = sd(max_value[11:15]) 
+
+#Theoretical max, will be at when ratio's are 1 and the het uses the GWAS allele frequencies
+#This will be the same across all the scenario's since we are considering the same SNPs
+#Load in the sumstats to get GWAS AFs;
+sumstats = readRDS("data/summary_stats_EUR")
+het      = 4 * sumstats$A1FREQ *(1-sumstats$A1FREQ)
+theoretical_max = sum(dgamma(rep(1,nrow(results[[1]][[1]]$inferred_af_given_weights)),shape = 1e4*het, scale = 1/(1e4*het),log = T))
+
+#Now do the inference of the r2 accuracy (across last 90% of the data) averaged across the chains
+#To do this we need to use the allele frequencies of the last 90% of the data
+nChains = 5
+af_r2      = c()
+counter = 1
+for (i in 1:(length(populations))) {
+  for (j in 1:nChains) {
+      print(i*3+1)
+      #Get the last 90% avg of the data
+      updates                = ncol(results[[i*3]][[j]]$inferred_af_given_weights)
+      print(updates)
+      inferred_af_90_percent = rowMeans(results[[i*3]][[j]]$inferred_af_given_weights[,(.9*updates):updates])
+      af_r2[counter]         = summary(lm(inferred_af_90_percent~sumstats$A1FREQ[1:1000]))$r.squared
+      counter = counter + 1
+  }
+}
+
+r2_inferred_EUR          = mean(af_r2[1:5]) 
+r2_inferred_AFR          = mean(af_r2[6:10]) 
+r2_inferred_EUR_AFR      = mean(af_r2[11:15]) 
+r2_inferred_sd_EUR       = sd(af_r2[1:5]) 
+r2_inferred_sd_AFR       = sd(af_r2[6:10]) 
+r2_inferred_sd_EUR_AFR  = sd(af_r2[11:15]) 
+
+af_r2_withheld_counter = c()
+counter = 1
+for (i in 1:(length(populations))) {
+  for (j in 1:nChains) {
+      #Get the last 90% avg of the data
+      updates                = ncol(results[[i*3]][[j]]$Gibbs_Array)
+      weights = rowMeans(results[[i*3]][[j]]$Gibbs_Array[,(.9*updates):updates])/(sum(rowMeans(results[[i*3]][[j]]$Gibbs_Array[,(.9*updates):updates])))
+      haps    = readRDS(sprintf("data/reference_panel_%s", populations[[i]]))
+      af_r2_withheld_counter[counter] = summary(lm(colSums(weights * haps)~sumstats$A1FREQ))$r.squared      
+      counter = counter + 1
+  }
+}
+
+r2_withheld_EUR          = mean(af_r2_withheld_counter[1:5]) 
+r2_withheld_AFR          = mean(af_r2_withheld_counter[6:10]) 
+r2_withheld_EUR_AFR      = mean(af_r2_withheld_counter[11:15]) 
+r2_withheld_sd_EUR       = sd(af_r2_withheld_counter[1:5]) 
+r2_withheld_sd_AFR       = sd(af_r2_withheld_counter[6:10]) 
+r2_withheld_sd_EUR_AFR   = sd(af_r2_withheld_counter[11:15]) 
+
+#Lastly for the for the ancestry inference, do for the case of EUR and AFR weights, 
+for (i in 1:nChains) {
+  weights_averaged_across_90pc = (results[[9]][[i]]$Gibbs_Array[,(.9*updates):updates]/(sum(rowMeans(results[[9]][[i]]$Gibbs_Array[,(.9*updates):updates]))))
+  print(dim(weights_averaged_across_90pc))
+  ancestry[i]= ((sum(weights_averaged_across_90pc[1:1006,1])/1006)/((sum(weights_averaged_across_90pc[1322:nrow(weights_averaged_across_90pc),1])/1322) +                                                                                           sum(weights_averaged_across_90pc[1:1006,1]/1006)))
+}
+
+
+#Add the values for the base reference panels
+max_likelihood_ref = c()
+r2_ref = c()
+for (i in 1:length(populations)) {
+  haps = readRDS(sprintf("data/reference_panel_%s", populations[[i]]))
+  het                 = 4 * colMeans(haps[,1:1000]) *(1-colMeans(haps[,1:1000]))
+  max_likelihood_ref[i] = sum(dgamma(colMeans(haps[,1:1000]),shape = 1e4*het, scale = 1/(1e4*het),log = T))
+  r2_ref[i] = summary(lm(colMeans(haps[,1:1000])~sumstats$A1FREQ[1:1000]))$r.squared
+}
+
+#Get the values of the r2 as well
+plot(inferred_af_90_percent,sumstats$A1FREQ[1:1000])
+ancestry_mean = mean(ancestry)
+#BUILD THE FINAL TABLE
+rownames       = c("Inferred EUR","Inferred AFR","Inferred EUR+AFR","Ref EUR", "Ref AFR", "Ref EUR+AFR")
+colnames       = c("Max Likelihood", "Theoretical Max", "r2 inferred SNPs", "r2 withheld SNPs", "Ancestry Proportions")
+table_results  = cbind(c(avg_EUR,avg_AFR,avg_EUR_AFR,max_likelihood_ref[1],max_likelihood_ref[2],max_likelihood_ref[3]),c(rep(theoretical_max,3),NA,NA,NA),c(r2_inferred_EUR,r2_inferred_AFR,r2_inferred_EUR_AFR,NA,NA,NA),c(r2_withheld_EUR, r2_withheld_AFR, r2_withheld_EUR_AFR,r2_ref[1],r2_ref[2],r2_ref[3]), c(NA,NA,ancestry_mean,NA,NA,NA))
+colnames(table_results) = colnames
+rownames(table_results) = rownames
+knitr::kable(table_results)
+
+```
+
+
+
+```{r LD Plots}
+#Generate names list results
+del<-exp(-abs(im - t(im))*0.025)
+compare_ld = function(results) #Results is a named list, wherein the elements correspond to the results from some reference panel population (can be mixed))
+{
+  #Read in the LD from UKBB GWAS data (currently only the first 1000 SNPs) --> fix later? 
+  gwas_ld = as.matrix(fread("plink.ld"))
+  figures_list = list()
+  for (i in 1:length(results)) {
+    #Normalize the weights on last 90% of the data
+    wts    = rowMeans(results[[i]]$Gibbs_Array[,floor(.9*ncol(results[[i]]$Gibbs_Array)):ncol(results[[i]]$Gibbs_Array)])
+    wts    = wts/sum(wts)
+    #Load in the reference panel
+    haps   = readRDS(sprintf("data/segemented_regions/%s_ref_hap_panel_region_1", names(results)[i]))
+    nsnps = ncol(haps)
+    #Calculate the LD with wts
+    inferred_LD  = c(cov.wt(haps,wt = wts, method="ML", cor=TRUE)$cor)
+    inferred_LD = c(inferred_LD * del)
+    true_gwas_LD = c(gwas_ld)
+    #Calculate reference LD
+    ref_LD       = c(cov.wt(haps, method="ML", cor=TRUE)$cor)
+    #Subsample 
+    fig = plot_ly()
+    fig <- plot_ly(data = iris, x = ~true_gwas_LD)
+    fig <- fig %>% add_trace(y = ~ref_LD, name = sprintf('%s Reference Panel',names(results)[i]),mode = 'markers', marker = list(opacity = 0.5))
+    fig <- fig %>% add_trace(y = ~inferred_LD, name = sprintf('%s Inferred Panel',names(results)[i]), mode = 'markers',marker = list(opacity = 0.5))
+    print(summary(lm(true_gwas_LD~inferred_LD))$r.squared)
+    figures_list[[i]] = plotly_build(fig)
+  }
+  #Do the subplot
+  figure = subplot(figures_list)
+  figure <- figure %>% layout(title = "LD Comparison",
+          yaxis = list(title = 'True GWAS LD'),
+          xaxis = list(title = 'Inferred LD'))
+  return(figure)
+}
+
+compare_ld(results_across_pops)
+```
+Do the Allele frequencies now 
+
+```{r}
+compare_af_inferred = function(results) #Results is a named list, wherein the elements correspond to the results from some reference panel population (can be mixed))
+{
+  #Read in the LD from UKBB GWAS data (currently only the first 1000 SNPs) --> fix later? 
+  figures_list = list()
+  for (i in 1:length(results)) {
+    #Load in the reference panel
+    haps   = readRDS(sprintf("data/segemented_regions/%s_ref_hap_panel_region_1", names(results)[i]))
+    #Read in the GWAS summary statistics
+    sumstats = readRDS(sprintf("data/segemented_regions/%s_sumstats_region_1",names(results)[i]))
+    gwas_af  = sumstats$A1FREQ
+    #Calculate reference AFs on these SNPs
+    ref_af       = colMeans(haps)
+    #Get my allele frequencies averaged out over the last 90% of the samples
+    updates                = ncol(results[[i]]$inferred_af_given_weights)
+    print(0.9*updates)
+    inferred_af  = rowMeans(results[[i]]$inferred_af_given_weights[,(.9*updates):updates])
+    #Plot the results
+    fig = plot_ly()
+    fig <- plot_ly(data = iris, x = ~gwas_af)
+    fig <- fig %>% add_trace(y = ~ref_af, name = sprintf('%s Reference Panel',names(results)[i]),mode = 'markers', marker = list(opacity = 0.5))
+    fig <- fig %>% add_trace(y = ~inferred_af, name = sprintf('%s Inferred Panel',names(results)[i]), mode = 'markers',marker = list(opacity = 0.5))
+    figures_list[[i]] = plotly_build(fig)
+  }
+  #Do the subplot
+  figure = subplot(figures_list)
+  figure <- figure %>% layout(title = "AF Comparison",
+          yaxis = list(title = 'True GWAS AF'),
+          xaxis = list(title = 'Comparison AF'))
+return(figure)
+}
+
+compare_af_inferred(results_across_pops)
+```
+
+Now do the same but with the witheld SNPs
+```{r}
+results_across_pops = list(results[[3]][[5]],results[[6]][[5]],results[[9]][[4]])
+names(results_across_pops) = c("EUR","AFR","EUR_AFR")
+
+compare_af_withheld = function(results) #Results is a named list, wherein the elements correspond to the results from some reference panel population (can be mixed))
+{
+  #Read in the LD from UKBB GWAS data (currently only the first 1000 SNPs) --> fix later? 
+  figures_list = list()
+  for (i in 1:length(results)) {
+    #Load in the reference panel
+    haps   = readRDS(sprintf("data/reference_panel_%s", names(results)[i]))
+    #Read in the GWAS summary statistics
+    sumstats = readRDS(sprintf("data/summary_stats_%s",names(results)[i]))
+    gwas_af  = sumstats$A1FREQ[-c(1:1000)]
+    #Calculate reference AFs on these SNPs
+    ref_af       = colMeans(haps[,-c(1:1000)])
+    #Get my allele frequencies averaged out over the last 90% of the samples
+    #Do this on the WITHHELD SNPs
+    updates        = ncol(results[[i]]$inferred_af_given_weights)
+    weights        = rowMeans(results[[i]]$Gibbs_Array[,(.9*updates):updates])/(sum(rowMeans(results[[i]]$Gibbs_Array[,(.9*updates):updates])))
+    af_r2_withheld = colSums(weights * haps[,-c(1:1000)])
+    #Plot the results
+    fig = plot_ly()
+    fig <- plot_ly(data = iris, x = ~gwas_af)
+    fig <- fig %>% add_trace(y = ~ref_af, name = sprintf('%s Reference Panel',names(results)[i]),mode = 'markers', marker = list(opacity = 0.5))
+    fig <- fig %>% add_trace(y = ~af_r2_withheld, name = sprintf('%s Inferred Panel',names(results)[i]), mode = 'markers',marker = list(opacity = 0.5))
+    figures_list[[i]] = plotly_build(fig)
+  }
+  #Do the subplot
+  figure = subplot(figures_list)
+  figure <- figure %>% layout(title = "With-held AF Comparison",
+          yaxis = list(title = 'True GWAS With-held AF'),
+          xaxis = list(title = 'Comparison  With-heldAF'))
+return(figure)
+}
+compare_af_withheld(results_across_pops)
+```
+
+Likelihood plots
+
+```{r}
+
+results_across_pops = list(list(results[[3]][[1]],results[[3]][[2]],results[[3]][[3]],results[[3]][[4]],results[[3]][[5]]),
+                           list(results[[6]][[1]],results[[6]][[2]],results[[6]][[3]],results[[6]][[4]],results[[6]][[5]]),
+                           list(results[[9]][[1]],results[[9]][[2]],results[[6]][[3]],results[[9]][[4]],results[[9]][[5]]))
+names(results_across_pops) = c("EUR","AFR","EUR_AFR")
+
+likelihood_across_chains = function(inference_results)  
+{
+  #Do this across populations
+  graphs_across_pops = list()
+  for (i in 1:length(inference_results)) {
+    p <- plot_ly()
+    for(j in 1:length(inference_results[[1]])) {
+      p <- add_trace(p, y=inference_results[[i]][[j]]$log_likelihood, x=seq(1:length(inference_results[[i]][[j]]$log_likelihood)), evaluate = TRUE, mode = 'lines', showlegend = F)
+    }
+  graphs_across_pops[[i]] = p
+  }
+  
+  #Make a subplot among the 
+  fig <- subplot(graphs_across_pops, titleX = T, shareX = T)
+  
+  fig <- fig %>% layout(title = 'Log-Likelihood Traces',
+         yaxis = list(title = "Log-likelihood"))
+  fig %>% layout(annotations = list(x = 0.2 , y = 1.05, text = "AA", showarrow = F, xref='paper', yref='paper'))
+  return(fig)
+}
+
+likelihood_across_chains(inference_results = results_across_pops)
+```
+
+Plot the Ancestry Fraction across the mixed panel:
+
+```{r}
+ancestry_graphs = function(inference_results){
+  #Get the average across the chains (TO-DO)
+  #Normalise the weights
+  norm_weights = inference_results$Gibbs_Array %*% diag(1/colSums(inference_results$Gibbs_Array))
+  #Calculate the sum of the weights on the EUROPEAN haplotypes 
+  EUR_Weights = colSums(norm_weights[1:1006,])
+  AFR_Weights = colSums(norm_weights[1006:2328,])
+  #Reweight due to EUR and AFR having higher numbers
+  nhap_norm_EUR_weights = (EUR_Weights/1006)/((AFR_Weights/1332)+(EUR_Weights/1006))
+  fig <- plot_ly(data = iris, x = ~seq(1:length(nhap_norm_EUR_weights)), y = ~nhap_norm_EUR_weights, mode = 'lines')
+  
+  fig <- fig %>% layout(title = 'Ancestry Assignment',
+         xaxis = list(title = 'Update number'),
+         yaxis = list(title = 'European Weights %'))
+  return(fig)
+  
+}
+
+ancestry_graphs(results[[9]][[3]])
+```
+
+Do the heatmap plots
+```{r}
+results_across_pops = list(results[[3]][[4]],results[[6]][[4]],results[[9]][[4]])
+names(results_across_pops) = c("EUR","AFR","EUR_AFR")
+
+heatmap_ancestry = function(results){
+  figures_list = list()
+  for (i in 1:length(results)) {
+    #Normalize the weights on last 90% of the data
+    norm_weights = results[[i]]$Gibbs_Array %*% diag(1/colSums(results[[i]]$Gibbs_Array))
+    #Subsample down to every 5th update
+    indexes = sort(sample(1:ncol(norm_weights),size = ncol(norm_weights)/100,replace = F))
+    fig <- plot_ly(z = log10(norm_weights[,indexes]), type = "heatmap")
+    figures_list[[i]] = plotly_build(fig)
+  }
+  #Do the subplot
+  figure = subplot(figures_list)
+  return(figure)
+}
+
+heatmap_ancestry(results_across_pops)
+```
+
+Plot the last update weights
+
+```{r}
+final_weights_assignment = function(results){
+  figures_list = list()
+  for (i in 1:length(results)) {
+    #Normalize the weights on last 90% of the data
+    fig <- plot_ly(data = iris, x = ~seq(1:nrow(results[[i]]$Gibbs_Array)), y = ~-log10(results[[i]]$Gibbs_Array[,ncol(results[[i]]$Gibbs_Array)]),marker = list(opacity = 0.5))
+
+    #Subsample down to every 5th update
+    figures_list[[i]] = plotly_build(fig)
+  }
+  #Do the subplot
+  figure = subplot(figures_list)
+  return(figure)
+}
+
+results_across_pops = list(results[[3]][[4]],results[[6]][[4]],results[[9]][[4]])
+final_weights_assignment(results_across_pops)
+
+```
+

@@ -1,0 +1,121 @@
+```{r}
+#To simulate drift in LD metrics
+colors = RColorBrewer::brewer.pal(3,"Dark2")
+#N    = Pop size
+#f0   = Initial haplotype frequencies (00, 10, 01, 11)
+#gens = No. generations
+#r    = recombination rate
+
+simulate.pop<-function(N=5, f0=c(0.25, 0.25, 0.25, 0.25), gens=100, r=0.1, show.plot=TRUE) {
+
+	f0<-f0/sum(f0);				               #Normalise freqs
+	type0<-sample(1:4, N, rep=T, p=f0);	 #Sample initial population with given frequencies
+	pop0<-array(0, c(N, 2));             #Store array of dimension pop size by 2
+	#Pop0 looks at the presence of a mutation at either site 1 or 2
+	pop0[(type0==2) | (type0==4), 1] = 1 #10 or 11 haplotype
+	pop0[(type0==3) | (type0==4), 2] = 1 #01 or 11 haplotype
+
+	#Initialise results array
+	op<-array(0, c(gens, 5));                         #Generate results array
+	colnames(op)<-c("Gen", "F1", "F2", "D12", "rAB"); #Store results (Gen, pi_pop_1, pi_pop_2,D,r)
+	op[1,]<-c(1, mean(pop0[,1]), mean(pop0[,2]), cov(pop0[,1], pop0[,2]), cor(pop0[,1], pop0[,2]));
+
+	#Run simulation
+	for (gen in 1:gens) {
+		par1<-sample(N, N, replace=T); #Sample parent 1
+		pop1<-pop0[par1,];             #Extract parents in population
+		w.rec<-which(runif(N)<r);			 #Choose who to recombine
+		if (length(w.rec)>0) {
+			par2<-sample(N, length(w.rec)); #When we recombine we pick a new set of parents
+			pop1[w.rec,2]<-pop0[par2,2];
+		}
+		pop0<-pop1;
+		op[gen,]<-c(gen, mean(pop0[,1]), mean(pop0[,2]), cov(pop0[,1], pop0[,2]), cor(pop0[,1], pop0[,2]));
+		if (min(op[gen,2:3])<1e-6) {
+			break();
+			op<-op[1:gen,];
+		}
+	}
+
+	if (show.plot) {
+		par(mfrow=c(1,1));
+		plot(op[,1], op[,2], type="l", col="blue", xlab="Generation", ylab="Population Genetic Statistics", ylim=c(0,1));
+		lines(op[,1], op[,3], type="l", col="orange");
+		lines(op[,1], abs(op[,5]), type="l", col="black", lwd=2)
+	}
+
+	return(op);
+}
+
+#Single example
+tmp<-simulate.pop(N=500, f0=c(0.3,0.2,0.4,0.1), gens=100, r=1e-100,show.plot = F)
+fig <- plot_ly(data = iris, x = ~seq(1:100))
+fig <- fig %>% add_trace(y = ~tmp[,2], name = 'Allle Frequency A',mode = 'lines', color = colors[1])
+fig <- fig %>% add_trace(y = ~tmp[,3], name = 'Allle Frequency B', mode = 'lines',color = colors[2])
+fig <- fig %>% add_trace(y = ~tmp[,5], name = 'r', mode = 'lines',color = colors[3])
+fig <- fig %>% layout(
+    title = "Wright Fischer Model Drift in LD Metrics",
+      xaxis = list(title = "Generations"),
+      yaxis = list(title = "Population Genetic Statistics")
+    )
+fig
+
+```
+
+
+
+```{r}
+#WF w recombination
+par(mfrow = c(2, 2)) # Create a 2 x 2 plotting matrix
+recomb_params = c(0.9,0.1,0.01, 0.001)
+tmp = list()
+for (i in 1:length(recomb_params)) {
+  tmp[[i]]<-simulate.pop(N=500, f0=c(0.3,0.2,0.4,0.1), gens=100, r=recomb_params[i], show.plot = F)
+}
+
+
+fig_1 <- plot_ly(data = iris, x = ~seq(1:100))
+fig_1 <- fig_1 %>% add_trace(y = ~tmp[[1]][,2], name = 'Allle Frequency A',mode = 'lines', color = colors[1])
+fig_1 <- fig_1 %>% add_trace(y = ~tmp[[1]][,3], name = 'Allle Frequency B', mode = 'lines',color = colors[2])
+fig_1 <- fig_1 %>% add_trace(y = ~tmp[[1]][,5], name = 'r', mode = 'lines',color = colors[3])
+
+fig_2 <- plot_ly(data = iris, x = ~seq(1:100))
+fig_2 <- fig_2 %>% add_trace(y = ~tmp[[2]][,2], name = 'Allle Frequency A',mode = 'lines',showlegend = F,color = colors[1])
+fig_2 <- fig_2 %>% add_trace(y = ~tmp[[2]][,3], name = 'Allle Frequency B', mode = 'lines',showlegend = F,color = colors[2])
+fig_2 <- fig_2 %>% add_trace(y = ~tmp[[2]][,5], name = 'r', mode = 'lines',showlegend = F,color = colors[3])
+
+fig_3 <- plot_ly(data = iris, x = ~seq(1:100))
+fig_3 <- fig_3 %>% add_trace(y = ~tmp[[3]][,2], name = 'Allle Frequency A',mode = 'lines',showlegend = F, color = colors[1])
+fig_3 <- fig_3 %>% add_trace(y = ~tmp[[3]][,3], name = 'Allle Frequency B', mode = 'lines',showlegend = F, color = colors[2])
+fig_3 <- fig_3 %>% add_trace(y = ~tmp[[3]][,5], name = 'r', mode = 'lines',showlegend = F,color =  colors[3])
+
+fig_4 <- plot_ly(data = iris, x = ~seq(1:100))
+fig_4 <- fig_4 %>% add_trace(y = ~tmp[[4]][,2], name = 'Allele Frequency A',mode = 'lines',showlegend = F,color = colors[1])
+fig_4 <- fig_4 %>% add_trace(y = ~tmp[[4]][,3], name = 'Allele Frequency B', mode = 'lines',showlegend = F,color = colors[2])
+fig_4 <- fig_4 %>% add_trace(y = ~tmp[[4]][,5], name = 'r', mode = 'lines',showlegend = F,color = colors[3])
+
+fig <- subplot(fig_1,fig_2,fig_3,fig_4, nrows = 2, shareX = T, shareY = T,titleX = F, titleY = F)
+fig %>% layout(title = "Wright Fischer Model with Recombination Across Different Rates",xaxis = list(title = ""),yaxis = list(title = ""))
+fig
+
+```
+
+```{r}
+#WF across Generations
+#Multiple examples with same starting point
+par(mfrow = c(2, 2)) # Create a 2 x 2 plotting matrix
+recomb_params = c(0.9,0.1,0.01, 0.0001)
+for (j in 1:length(recomb_params)) {
+  n.sim<-100;
+  N.sim<-1000;
+  gens.sim<-100;
+  f0.sim<-c(1,1,1,1);
+  r.sim<-0.001;
+  plot(c(0,0), xlim=c(0,gens.sim), ylim=c(-1,1), xlab="Generation", ylab="r", type="n");
+  for (i in 1:n.sim) {
+  	tmp<-simulate.pop(N=N.sim, f0=f0.sim, gens=gens.sim, r=recomb_params[j], show.plot=F);
+  	lines(tmp[,1], tmp[,5], col=hsv(0,0,0,alpha=0.2));
+    }
+}
+```
+

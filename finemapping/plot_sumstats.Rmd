@@ -1,0 +1,296 @@
+---
+title: "plot_sumstats_analysis"
+author: "Marcus Tutert"
+date: "06/03/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(rlist)
+library(reshape2)
+library(plotly)
+library(RColorBrewer)
+mypalette = brewer.pal(4, "Dark2")
+```
+
+Plot the analysis of the sumstats. We want to have a series of 2, 1x2 plots which each corresponds to signal = TRUE and signal = FALSE
+Each of the column plots will correspond to the common vs the rare variants, and within each of the violin plots, we will have categorical axis for all the divergence times (for now), including one with the GWAS used as reference
+
+```{r, Signal True}
+divergence_time      = c("0","10","50","125")
+nRegions             = 99#Grab this from snakemake file
+data_length          = nRegions * length(divergence_time)#Grab this from snakemake file
+
+### COMMON VARIANTS ###
+common_variants      = list.files(path = "pop_split/sumstat_imputation/results/", pattern = "pooled_common\\w+_TRUE_ref_LD", full.names = T)
+gwas_common_variants = list.files(path = "pop_split/sumstat_imputation/results/", pattern = "pooled_common\\w+_TRUE_gwas_LD", full.names = T)
+gwas_results         = list()
+ref_results          = data.frame(matrix(ncol = length(divergence_time), nrow = data_length))
+x <- as.character(divergence_time)
+colnames(ref_results)  = x
+colnames(ref_results)  = x
+
+#Read in the GWAS LD analysis data (this is across all divergence times since it doesn't really matter)
+for (i in 1:length(divergence_time)) {
+  temp           = unlist(readRDS(gwas_common_variants[i]))
+  c(temp,rep(NA,))
+  gwas_results[[i]] = unlist(readRDS(gwas_common_variants[i]))
+}
+gwas_results  = unlist(c(gwas_results))
+npanels_total = length(gwas_results)
+
+#Read in the Ref LD analysis data
+for (i in 1:length(divergence_time)) {
+  temp             = unlist(readRDS(common_variants[i]))
+  results_temp     = c(temp,rep(NA,data_length-length(temp)))
+  ref_results[,i]  = results_temp
+}
+
+#Reshape the data
+results =  cbind(ref_results,gwas_results)
+colnames(results)[5] = "GWAS LD"
+##Reshape the data table
+reshaped_results <- melt(data = results, variable.name = "divergence_time")
+
+fig_common_variants <- reshaped_results %>%
+  plot_ly(
+    x = ~reshaped_results$divergence_time,
+    y = ~reshaped_results$value,
+    split = ~divergence_time,
+    type = 'violin',
+    colors = (mypalette),
+    color = ~divergence_time,
+    box = list(
+      visible = T
+    ),
+    meanline = list(
+      visible = T
+    )
+  ) 
+
+fig_common_variants <- fig_common_variants %>%
+  layout(
+    xaxis = list(
+      title = "Common Variants (>5% MAF)",
+      zeroline = FALSE,
+      showline = FALSE,
+      showticklabels = FALSE,
+      showgrid = FALSE
+    ),
+    yaxis = list(
+      title = "Divergence Time",
+      zeroline = F
+    ),
+    title = "Summary Statistic Imputation Common Variants Accuracy (Null)",
+    legend = list(title = list("Divergence Time"))
+  )
+### RARE VARIANTS ###
+rare_variants      = list.files(path = "pop_split/sumstat_imputation/results/", pattern = "pooled_rare\\w+_TRUE_ref_LD", full.names = T)
+gwas_rare_variants = list.files(path = "pop_split/sumstat_imputation/results/", pattern = "pooled_rare\\w+_TRUE_ref_LD", full.names = T)
+gwas_results         = list()
+ref_results          = data.frame(matrix(ncol = length(divergence_time), nrow = data_length))
+x <- as.character(divergence_time)
+colnames(ref_results)  = x
+colnames(ref_results)  = x
+
+#Read in the GWAS LD analysis data (this is across all divergence times since it doesn't really matter)
+for (i in 1:length(divergence_time)) {
+  temp           = unlist(readRDS(gwas_rare_variants[i]))
+  c(temp,rep(NA,))
+  gwas_results[[i]] = unlist(readRDS(gwas_rare_variants[i]))
+}
+gwas_results  = unlist(c(gwas_results))
+npanels_total = length(gwas_results)
+
+#Read in the Ref LD analysis data
+for (i in 1:length(divergence_time)) {
+  temp             = unlist(readRDS(rare_variants[i]))
+  results_temp     = c(temp,rep(NA,data_length-length(temp)))
+  ref_results[,i]  = results_temp
+}
+
+#Reshape the data
+results =  cbind(ref_results,gwas_results)
+colnames(results)[5] = "GWAS LD"
+results =  cbind(ref_results,gwas_results)
+##Reshape the data table
+reshaped_results_rare <- melt(data = results, variable.name = "divergence_time")
+
+fig_rare_variants <- reshaped_results_rare %>%
+  plot_ly(
+    x = ~reshaped_results_rare$divergence_time,
+    y = ~reshaped_results_rare$value,
+    split = ~divergence_time,
+    color = ~divergence_time,
+    colors = (mypalette),
+    type = 'violin',
+    showlegend = FALSE,
+    box = list(
+      visible = T
+    ),
+    meanline = list(
+      visible = T
+    )
+  ) 
+
+fig_rare_variants <- fig_rare_variants %>%
+  layout(
+    xaxis = list(
+      title = "Rare Variants (<5% MAF)", 
+      zeroline = FALSE,
+      showline = FALSE,
+      showticklabels = FALSE,
+      showgrid = FALSE
+    ),
+    yaxis = list(
+      title = "Divergence Time",
+      zeroline = F
+    ),
+    title = "Summary Statistic Imputation Rare Variants Accuracy (Null)"
+  )
+
+fig <- subplot(fig_rare_variants,fig_common_variants, shareY = T, titleX = T)
+fig = fig %>% layout(color = mypalette, title = "Summary Statistic Imputation Accuracy (Causal Model)", yaxis = list(title ="r2 Correlation True Z-scores ~ Imputed Z-Scores"))
+fig
+```
+Run the same plots as before, but now with no signal (copy and paste these plots)
+```{r}
+#Currently am cyberducking off the POOLED data from rescomp to ~/Desktop, but probably there is a smarter way to do this
+divergence_time      = c("0","10","50","125")
+nRegions             = 999 #Grab this from snakemake file
+data_length          = nRegions * length(divergence_time)#Grab this from snakemake file
+
+### COMMON VARIANTS ###
+common_variants      = list.files(path = "pop_split/sumstat_imputation/results/", pattern = "pooled_common\\w+_FALSE_ref_LD", full.names = T)
+gwas_common_variants = list.files(path = "pop_split/sumstat_imputation/results/", pattern = "pooled_common\\w+_FALSE_gwas_LD", full.names = T)
+gwas_results         = list()
+ref_results          = data.frame(matrix(ncol = length(divergence_time), nrow = data_length))
+x <- as.character(divergence_time)
+colnames(ref_results)  = x
+colnames(ref_results)  = x
+
+#Read in the GWAS LD analysis data (this is across all divergence times since it doesn't really matter)
+for (i in 1:length(divergence_time)) {
+  temp           = unlist(readRDS(gwas_common_variants[i]))
+  c(temp,rep(NA,))
+  gwas_results[[i]] = unlist(readRDS(gwas_common_variants[i]))
+}
+gwas_results  = unlist(c(gwas_results))
+npanels_total = length(gwas_results)
+
+#Read in the Ref LD analysis data
+for (i in 1:length(divergence_time)) {
+  temp             = unlist(readRDS(common_variants[i]))
+  results_temp     = c(temp,rep(NA,data_length-length(temp)))
+  ref_results[,i]  = results_temp
+}
+
+#Reshape the data
+results =  cbind(ref_results,gwas_results)
+colnames(results)[5] = "GWAS LD"
+##Reshape the data table
+reshaped_results <- melt(data = results, variable.name = "divergence_time")
+
+fig_common_variants <- reshaped_results %>%
+  plot_ly(
+    x = ~reshaped_results$divergence_time,
+    y = ~reshaped_results$value,
+    split = ~divergence_time,
+    type = 'violin',
+    colors = (mypalette),
+    color = ~divergence_time,
+    box = list(
+      visible = T
+    ),
+    meanline = list(
+      visible = T
+    )
+  ) 
+
+fig_common_variants <- fig_common_variants %>%
+  layout(
+    xaxis = list(
+      title = "Common Variants (>5% MAF)",
+      zeroline = FALSE,
+      showline = FALSE,
+      showticklabels = FALSE,
+      showgrid = FALSE
+    ),
+    yaxis = list(
+      title = "Divergence Time",
+      zeroline = F
+    ),
+    title = "Summary Statistic Imputation Common Variants Accuracy (Null)",
+    legend = list(title = list("Divergence Time"))
+  )
+### RARE VARIANTS ###
+rare_variants      = list.files(path = "pop_split/sumstat_imputation/results/", pattern = "pooled_rare\\w+_FALSE_ref_LD", full.names = T)
+gwas_rare_variants = list.files(path = "pop_split/sumstat_imputation/results/", pattern = "pooled_rare\\w+_FALSE_gwas_LD", full.names = T)
+gwas_results         = list()
+ref_results          = data.frame(matrix(ncol = length(divergence_time), nrow = data_length))
+x <- as.character(divergence_time)
+colnames(ref_results)  = x
+colnames(ref_results)  = x
+
+#Read in the GWAS LD analysis data (this is across all divergence times since it doesn't really matter)
+for (i in 1:length(divergence_time)) {
+  temp           = unlist(readRDS(gwas_rare_variants[i]))
+  c(temp,rep(NA,))
+  gwas_results[[i]] = unlist(readRDS(gwas_rare_variants[i]))
+}
+gwas_results  = unlist(c(gwas_results))
+npanels_total = length(gwas_results)
+
+#Read in the Ref LD analysis data
+for (i in 1:length(divergence_time)) {
+  temp             = unlist(readRDS(rare_variants[i]))
+  results_temp     = c(temp,rep(NA,data_length-length(temp)))
+  ref_results[,i]  = results_temp
+}
+
+#Reshape the data
+results =  cbind(ref_results,gwas_results)
+colnames(results)[5] = "GWAS LD"
+results =  cbind(ref_results,gwas_results)
+##Reshape the data table
+reshaped_results_rare <- melt(data = results, variable.name = "divergence_time")
+
+fig_rare_variants <- reshaped_results_rare %>%
+  plot_ly(
+    x = ~reshaped_results_rare$divergence_time,
+    y = ~reshaped_results_rare$value,
+    split = ~divergence_time,
+    color = ~divergence_time,
+    colors = (mypalette),
+    type = 'violin',
+    showlegend = FALSE,
+    box = list(
+      visible = T
+    ),
+    meanline = list(
+      visible = T
+    )
+  ) 
+
+fig_rare_variants <- fig_rare_variants %>%
+  layout(
+    xaxis = list(
+      title = "Rare Variants (<5% MAF)", 
+      zeroline = FALSE,
+      showline = FALSE,
+      showticklabels = FALSE,
+      showgrid = FALSE
+    ),
+    yaxis = list(
+      title = "Divergence Time",
+      zeroline = F
+    ),
+    title = "Summary Statistic Imputation Rare Variants Accuracy (Null)"
+  )
+
+fig <- subplot(fig_rare_variants,fig_common_variants, shareY = T, titleX = T)
+fig = fig %>% layout(color = mypalette, title = "Summary Statistic Imputation Accuracy (Null Model)", yaxis = list(title ="r2 Correlation True Z-scores ~ Imputed Z-Scores"))
+fig
+```
+

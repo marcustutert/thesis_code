@@ -1,0 +1,463 @@
+---
+title: "plot_finemapping_results"
+author: "Marcus Tutert"
+date: "07/03/2021"
+output: html_document
+---
+
+```{r setup, include=TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+library(reshape2)
+library(plotly)
+library(tidyverse)
+```
+
+True sumstats credible set accuracy 
+```{r True-Sumstats}
+#Currently am cyberducking off the POOLED data from rescomp to ~/Desktop, but probably there is a smarter way to do this
+divergence_time      = c("0","10","50","125")
+nRegions             = 99 #Grab this from snakemake file
+data_length          = nRegions * length(divergence_time)#Grab this from snakemake file
+
+ref_ld_true_sumstats_file       = list.files(path = "pop_split/results/", pattern = "pooled_ref_ld_true_sumstats\\w+_", full.names = T)
+gwas_ld_true_sumstat_file       = list.files(path = "pop_split/results", pattern = "pooled_gwas_ld_true_sumstats\\w+_", full.names = T)
+ref_ld_true_sumstats_results    = data.frame(matrix(ncol = length(divergence_time), nrow = data_length))
+gwas_ld_true_sumstat_results    = list()
+
+#Pool all the GWAS data together (since it won't matter)
+for (i in 1:length(divergence_time)) {
+  temp           = unlist(readRDS(gwas_ld_true_sumstat_file[i]))
+  gwas_ld_true_sumstat_results[[i]] = unlist(readRDS(gwas_ld_true_sumstat_file[i]))
+}
+gwas_ld_true_sumstat_results  = unlist(c(gwas_ld_true_sumstat_results))
+
+#Read in the Ref LD analysis data
+for (i in 1:length(divergence_time)) {
+  temp             = unlist(readRDS(ref_ld_true_sumstats_file[i]))
+  results_temp     = c(temp,rep(NA,data_length-length(temp)))
+  ref_ld_true_sumstats_results[,i]  = results_temp
+}
+
+#Reshape the data
+results =  cbind(ref_ld_true_sumstats_results,gwas_ld_true_sumstat_results)
+colnames(results)[5] = "GWAS LD"
+colnames(results)[1:4] = divergence_time
+##Reshape the data table
+reshaped_results <- melt(data = results, variable.name = "divergence_time")
+
+fig_finemapped_a <- reshaped_results %>%
+  plot_ly(
+    x = ~reshaped_results$divergence_time,
+    y = ~reshaped_results$value,
+    split = ~divergence_time,
+    type = 'violin',
+    colors = (mypalette),
+    color = ~divergence_time,
+    box = list(
+      visible = T
+    ),
+    meanline = list(
+      visible = T
+    )
+  ) 
+
+fig_finemapped_a <- fig_finemapped_a %>%
+  layout(
+    xaxis = list(
+      title = "LD Panel used in FINEMAP Analys",
+      zeroline = FALSE,
+      showline = FALSE,
+      showticklabels = FALSE,
+      showgrid = FALSE
+    ),
+    yaxis = list(
+      title = "PP Weighted True Fraction in 95% Credible Set",
+      zeroline = F
+    ),
+    title = "True GWAS Summary Statistics & Variable LD Panels Fine-Mapping Calibration",
+    legend = list(title = list("Divergence Time"))
+  )
+fig_finemapped_a
+```
+Indicator function
+```{r True Sumstats Indicator Functions}
+#Currently am cyberducking off the POOLED data from rescomp to ~/Desktop, but probably there is a smarter way to do this
+divergence_time      = c("0","10","50","125")
+nRegions             = 99 #Grab this from snakemake file (will want to increase this!)
+data_length          = nRegions #Grab this from snakemake file
+
+ref_ld_true_sumstats_file       = list.files(path = "pop_split/results/", pattern = "pooled_ref_ld_true_sumstats\\w+_indicator", full.names = T)
+gwas_ld_true_sumstat_file       = list.files(path = "pop_split/results/", pattern = "pooled_gwas_ld_true_sumstats\\w+_indicator", full.names = T)
+ref_ld_true_sumstats_results    = data.frame(matrix(ncol = length(divergence_time), nrow = data_length))
+gwas_ld_true_sumstat_results    = list()
+
+#Pool all the GWAS data together (since it won't matter)
+for (i in 1:length(divergence_time)) {
+  temp           = unlist(readRDS(gwas_ld_true_sumstat_file[i]))
+  gwas_ld_true_sumstat_results[[i]] = unlist(readRDS(gwas_ld_true_sumstat_file[i]))
+}
+gwas_ld_true_sumstat_results  = unlist(c(gwas_ld_true_sumstat_results))
+#Subsample down to nregions of these
+gwas_ld_true_sumstat_results = sample(gwas_ld_true_sumstat_results,99)
+#Read in the Ref LD analysis data
+for (i in 1:length(divergence_time)) {
+  temp             = unlist(readRDS(ref_ld_true_sumstats_file[i]))
+  results_temp     = c(temp,rep(NA,data_length-length(temp)))
+  ref_ld_true_sumstats_results[,i]  = results_temp
+}
+
+#Reshape the data
+results =  cbind(ref_ld_true_sumstats_results,gwas_ld_true_sumstat_results)
+colnames(results)[5] = "GWAS LD"
+colnames(results)[1:4] = divergence_time
+##Reshape the data table
+reshaped_results <- melt(data = results, variable.name = "divergence_time")
+x = reshaped_results[complete.cases(reshaped_results), ]
+
+#Get the counts
+y = x %>% group_by(divergence_time,.drop = FALSE) %>% count(value)
+y = as.data.frame(y)
+
+
+#For each divergence times (& the GWAS panel) we need to make sure we include all 4 possiblities (0,1,2,3 causal marginal SNPs included)
+for (i in 1:length(unique(as.character(y$divergence_time)))) {
+  #Find which values we are missing
+  marginal = c(0,1,2,3)
+  missed_marginal = (marginal[which(! marginal %in% y[y$divergence_time == unique(as.character(y$divergence_time))[i],]$value)])
+  #Add a fake dummy indicator for these values
+  for (j in 1:length(missed_marginal)) {
+      y = rbind(y,c(unique(as.character(y$divergence_time))[i],missed_marginal[j],0))
+  }
+}
+
+y = y[order(y$divergence_time,y$value),]
+y
+##Adding errors bars (to be binomially distributed)
+# plus/minus se = sqrt(pq), where n is number of regions, sqrt(nRegions*0.5)
+
+#Reshape based on the value?
+fig <- plot_ly(y , x = ~as.character(unique(y$divergence_time)), y = ~y[y$value == 3,]$n, type = 'bar', name = '3')
+fig <- fig %>% add_trace(x = ~as.character(unique(y$divergence_time)),y = ~as.numeric(y[y$value == 2,]$n), name = '2')
+fig <- fig %>% add_trace(x = ~as.character(unique(y$divergence_time)),y = ~as.numeric(y[y$value == 1,]$n, name = '1'))
+fig <- fig %>% add_trace(x = ~as.character(unique(y$divergence_time)),y = ~as.numeric(y[y$value == 0,]$n, name = '0'))
+fig <- fig %>% layout(yaxis = list(title = 'Number of Regions', barmode = 'group',autotick = F, dtick = 10),
+                      xaxis = list(title = "Divergence Panel",categoryorder = "array",categoryarray = as.character(unique(y$divergence_time))),
+                      title = "Proportion of Regions with True Causal Variant within Credible Set")
+fig
+
+```
+
+Now look at the imputed sumstats (w reference panel), with the reference panel
+```{r ref_ld_imputed_sumstats_by_ref_ld fdr}
+#Currently am cyberducking off the POOLED data from rescomp to ~/Desktop, but probably there is a smarter way to do this
+divergence_time      = c("0","10","50","125")
+nRegions             = 99 #Grab this from snakemake file
+data_length          = nRegions * length(divergence_time)#Grab this from snakemake file
+
+ref_ld_imputed_sumstats_by_ref_ld_file    = list.files(path = "pop_split/results/", pattern = "pooled_ref_ld_imputed_sumstats_by_ref_ld_\\w+_fdr", full.names = T)
+ref_ld_imputed_sumstats_by_ref_ld_results    = data.frame(matrix(ncol = length(divergence_time), nrow = data_length))
+
+
+#Read in the Ref LD analysis data
+for (i in 1:length(divergence_time)) {
+  temp             = unlist(readRDS(ref_ld_imputed_sumstats_by_ref_ld_file[i]))
+  results_temp     = c(temp,rep(NA,data_length-length(temp)))
+  ref_ld_imputed_sumstats_by_ref_ld_results[,i]  = results_temp
+}
+
+#Reshape the data
+results = ref_ld_imputed_sumstats_by_ref_ld_results
+colnames(results)[1:4] = divergence_time
+##Reshape the data table
+reshaped_results <- melt(data = results, variable.name = "divergence_time")
+
+fig_finemapped_b <- reshaped_results %>%
+  plot_ly(
+    x = ~reshaped_results$divergence_time,
+    y = ~reshaped_results$value,
+    split = ~divergence_time,
+    type = 'violin',
+    colors = (mypalette),
+    color = ~divergence_time,
+    box = list(
+      visible = T
+    ),
+    meanline = list(
+      visible = T
+    )
+  ) 
+
+fig_finemapped_b <- fig_finemapped_b %>%
+  layout(
+    xaxis = list(
+      title = "LD Panel used in FINEMAP Analys",
+      zeroline = FALSE,
+      showline = FALSE,
+      showticklabels = FALSE,
+      showgrid = FALSE
+    ),
+    yaxis = list(
+      title = "PP Weighted True Fraction in 95% Credible Set",
+      zeroline = F
+    ),
+    title = "Imputed GWAS Summary Statistics & Variable LD Panels Fine-Mapping Calibration",
+    legend = list(title = list("Divergence Time"))
+  )
+fig_finemapped_b
+```
+
+```{r ref_ld_imputed_sumstats_by_ref_ld Indicator}
+#Currently am cyberducking off the POOLED data from rescomp to ~/Desktop, but probably there is a smarter way to do this
+divergence_time      = c("0","10","50","125")
+nRegions             = 99 #Grab this from snakemake file
+data_length          = nRegions * length(divergence_time)#Grab this from snakemake file
+
+ref_ld_imputed_sumstats_by_ref_ld_file       = list.files(path = "pop_split/results/", pattern = "pooled_ref_ld_imputed_sumstats_by_ref_ld_region_indicator_dt\\w+", full.names = T)
+ref_ld_imputed_sumstats_by_ref_ld_results    = data.frame(matrix(ncol = length(divergence_time), nrow = data_length))
+
+#Read in the Ref LD analysis data
+for (i in 1:length(divergence_time)) {
+  temp             = unlist(readRDS(ref_ld_imputed_sumstats_by_ref_ld_file[i]))
+  results_temp     = c(temp,rep(NA,data_length-length(temp)))
+  ref_ld_imputed_sumstats_by_ref_ld_results[,i]  = results_temp
+}
+
+colnames(ref_ld_imputed_sumstats_by_ref_ld_results)[1:4] = divergence_time
+##Reshape the data table
+reshaped_results <- melt(data = ref_ld_imputed_sumstats_by_ref_ld_results, variable.name = "divergence_time")
+x = reshaped_results[complete.cases(reshaped_results), ]
+
+#Get the counts
+y = x %>% group_by(divergence_time,.drop = FALSE) %>% count(value)
+y = as.data.frame(y)
+
+#Divide by number of regions for GWAS and ref panels
+y[1:(nrow(y)),3] = y[1:(nrow(y)),3]/nRegions*100
+
+
+#For each divergence times (& the GWAS panel) we need to make sure we include all 4 possiblities (0,1,2,3 causal marginal SNPs included)
+for (i in 1:length(unique(as.character(y$divergence_time)))) {
+  #Find which values we are missing
+  marginal = c(0,1,2,3)
+  missed_marginal = (marginal[which(! marginal %in% y[y$divergence_time == unique(as.character(y$divergence_time))[i],]$value)])
+  print(missed_marginal)
+  #Add a fake dummy indicator for these values
+  for (j in 1:length(missed_marginal)) {
+      if (length(missed_marginal)>0) {
+              y = rbind(y,c(unique(as.character(y$divergence_time))[i],missed_marginal[j],0))
+      }
+  }
+}
+
+y = y[order(y$divergence_time,y$value),]
+
+
+#Reshape based on the value?
+fig <- plot_ly(y , x = ~as.character(unique(y$divergence_time)), y = ~y[y$value == 3,]$n, type = 'bar', name = '3')
+fig <- fig %>% add_trace(x = ~as.character(unique(y$divergence_time)),y = ~y[y$value == 2,]$n, name = '2')
+fig <- fig %>% add_trace(x = ~as.character(unique(y$divergence_time)),y = ~y[y$value == 1,]$n, name = '1')
+fig <- fig %>% add_trace(x = ~as.character(unique(y$divergence_time)),y = ~y[y$value == 0,]$n, name = '0')
+fig <- fig %>% layout(yaxis = list(title = 'Proportion of Regions',showticklabels = FALSE), barmode = 'group',
+                      xaxis = list(title = "Divergence Panel",categoryorder = "array",categoryarray = as.character(unique(y$divergence_time))),
+                      title = "Proportion of Regions with True Causal Variant within Credible Set")
+
+fig
+```
+
+Now move to the case where we have imputed with the correct panel, but still use the wrong reference LD
+```{r ref_ld_imputed_sumstats_by_gwas fdr }
+#Currently am cyberducking off the POOLED data from rescomp to ~/Desktop, but probably there is a smarter way to do this
+divergence_time      = c("0","10","50","125")
+nRegions           = 99 #Grab this from snakemake file
+data_length          = nRegions * length(divergence_time)#Grab this from snakemake file
+
+ref_ld_imputed_sumstats_by_gwas_ld_file    = list.files(path = "pop_split/results/", pattern = "pooled_ref_ld_imputed_sumstats_by_gwas_ld\\w+_fdr", full.names = T)
+ref_ld_imputed_sumstats_by_gwas_ld_results    = data.frame(matrix(ncol = length(divergence_time), nrow = data_length))
+gwas_ld_imputed_sumstats_by_gwas_ld_file      = list.files(path = "pop_split/results/", pattern = "pooled_gwas_ld_imputed_sumstats_by_gwas_ld\\w+_fdr", full.names = T)
+gwas_ld_imputed_sumstats_by_gwas_ld_results   = list()
+
+#Read in the Ref LD analysis data
+for (i in 1:length(divergence_time)) {
+  temp             = unlist(readRDS(ref_ld_imputed_sumstats_by_gwas_ld_file[i]))
+  results_temp     = c(temp,rep(NA,data_length-length(temp)))
+  ref_ld_imputed_sumstats_by_gwas_ld_results[,i]  = results_temp
+}
+
+#Pool all the GWAS data together (since it won't matter)
+for (i in 1:length(divergence_time)) {
+  gwas_ld_imputed_sumstats_by_gwas_ld_results[[i]] = unlist(readRDS(gwas_ld_imputed_sumstats_by_gwas_ld_file[i]))
+}
+gwas_ld_imputed_sumstats_by_gwas_ld_results  = unlist(c(gwas_ld_imputed_sumstats_by_gwas_ld_results))
+
+
+#Reshape the data
+results = cbind(ref_ld_imputed_sumstats_by_gwas_ld_results,gwas_ld_imputed_sumstats_by_gwas_ld_results)
+colnames(results)[1:4] = divergence_time
+colnames(results)[5]   = "GWAS LD"
+##Reshape the data table
+reshaped_results <- melt(data = results, variable.name = "divergence_time")
+
+fig_finemapped_c <- reshaped_results %>%
+  plot_ly(
+    x = ~reshaped_results$divergence_time,
+    y = ~reshaped_results$value,
+    split = ~divergence_time,
+    type = 'violin',
+    colors = (mypalette),
+    color = ~divergence_time,
+    box = list(
+      visible = T
+    ),
+    meanline = list(
+      visible = T
+    )
+  ) 
+
+fig_finemapped_c <- fig_finemapped_c %>%
+  layout(
+    xaxis = list(
+      title = "LD Panel used in FINEMAP Analys",
+      zeroline = FALSE,
+      showline = FALSE,
+      showticklabels = FALSE,
+      showgrid = FALSE
+    ),
+    yaxis = list(
+      title = "PP Weighted True Fraction in 95% Credible Set",
+      zeroline = F
+    ),
+    title = "Imputed (by GWAS Panel) Summary Statistics & Variable LD Panels Fine-Mapping Calibration",
+    legend = list(title = list("Divergence Time"))
+  )
+fig_finemapped_c
+```
+
+```{r ref_ld_imputed_sumstats_by_gwas_ld Indicator}
+#Currently am cyberducking off the POOLED data from rescomp to ~/Desktop, but probably there is a smarter way to do this
+divergence_time      = c("0","10","50","125")
+nRegions             = 99 #Grab this from snakemake file
+data_length          = nRegions * length(divergence_time)#Grab this from snakemake file
+
+ref_ld_imputed_sumstats_by_gwas_ld_file    = list.files(path = "pop_split/results/", pattern = "pooled_ref_ld_imputed_sumstats_by_gwas_ld_region_indicator_dt\\w+", full.names = T)
+ref_ld_imputed_sumstats_by_gwas_ld_results    = data.frame(matrix(ncol = length(divergence_time), nrow = data_length))
+gwas_ld_imputed_sumstats_by_gwas_ld_file      = list.files(path = "pop_split/results/", pattern = "pooled_gwas_ld_imputed_sumstats_by_gwas_ld_region_indicator_dt\\w+", full.names = T)
+gwas_ld_imputed_sumstats_by_gwas_ld_results   = list()
+
+#Read in the Ref LD analysis data
+for (i in 1:length(divergence_time)) {
+  temp             = unlist(readRDS(ref_ld_imputed_sumstats_by_gwas_ld_file[i]))
+  results_temp     = c(temp,rep(NA,data_length-length(temp)))
+  ref_ld_imputed_sumstats_by_gwas_ld_results[,i]  = results_temp
+}
+
+#Pool all the GWAS data together (since it won't matter)
+for (i in 1:length(divergence_time)) {
+  gwas_ld_imputed_sumstats_by_gwas_ld_results[[i]] = unlist(readRDS(gwas_ld_imputed_sumstats_by_gwas_ld_file[i]))
+}
+gwas_ld_imputed_sumstats_by_gwas_ld_results  = unlist(c(gwas_ld_imputed_sumstats_by_gwas_ld_results))
+
+
+#Reshape the data
+results = cbind(ref_ld_imputed_sumstats_by_gwas_ld_results,gwas_ld_imputed_sumstats_by_gwas_ld_results)
+colnames(results)[1:4] = divergence_time
+colnames(results)[5]   = "GWAS LD"
+##Reshape the data table
+reshaped_results <- melt(data = results, variable.name = "divergence_time")
+x = reshaped_results[complete.cases(reshaped_results), ]
+
+#Get the counts
+y = x %>% group_by(divergence_time,.drop = FALSE) %>% count(value)
+y = as.data.frame(y)
+
+#Divide by number of regions for GWAS and ref panels
+y[1:(nrow(y)-3),3] = y[1:(nrow(y)-3),3]/nRegions*100
+y[(nrow(y)-3):nrow(y),3] = y[(nrow(y)-3):nrow(y),3]/sum(y[(nrow(y)-3):nrow(y),3])*100
+
+#For each divergence times (& the GWAS panel) we need to make sure we include all 4 possiblities (0,1,2,3 causal marginal SNPs included)
+for (i in 1:length(unique(as.character(y$divergence_time)))) {
+  #Find which values we are missing
+  marginal = c(0,1,2,3)
+  missed_marginal = (marginal[which(! marginal %in% y[y$divergence_time == unique(as.character(y$divergence_time))[i],]$value)])
+  print(missed_marginal)
+  #Add a fake dummy indicator for these values
+  for (j in 1:length(missed_marginal)) {
+      if (length(missed_marginal)>0) {
+              y = rbind(y,c(unique(as.character(y$divergence_time))[i],missed_marginal[j],0))
+      }
+  }
+}
+
+y = y[order(y$divergence_time,y$value),]
+
+
+#Reshape based on the value?
+fig <- plot_ly(y , x = ~as.character(unique(y$divergence_time)), y = ~y[y$value == 3,]$n, type = 'bar', name = '3')
+fig <- fig %>% add_trace(x = ~as.character(unique(y$divergence_time)),y = ~y[y$value == 2,]$n, name = '2')
+fig <- fig %>% add_trace(x = ~as.character(unique(y$divergence_time)),y = ~y[y$value == 1,]$n, name = '1')
+fig <- fig %>% add_trace(x = ~as.character(unique(y$divergence_time)),y = ~y[y$value == 0,]$n, name = '0')
+fig <- fig %>% layout(yaxis = list(title = 'Proportion of Regions',showticklabels = FALSE), barmode = 'group',
+                      xaxis = list(title = "Divergence Panel",categoryorder = "array",categoryarray = as.character(unique(y$divergence_time))),
+                      title = "Proportion of Regions with True Causal Variant within Credible Set")
+fig
+
+```
+
+```{r}
+
+#Currently am cyberducking off the POOLED data from rescomp to ~/Desktop, but probably there is a smarter way to do this
+divergence_time      = c("0","10","50","125")
+nRegions             = 99 #Grab this from snakemake file
+data_length          = nRegions * length(divergence_time)#Grab this from snakemake file
+
+gwas_ld_imputed_sumstats_by_ref_ld_file    = list.files(path = "pop_split/results/", pattern = "pooled_gwas_ld_imputed_sumstats_by_ref_ld_dt\\w+", full.names = T)
+gwas_ld_imputed_sumstats_by_ref_ld_results    = data.frame(matrix(ncol = length(divergence_time), nrow = data_length))
+
+#Read in the Ref LD analysis data
+for (i in 1:length(divergence_time)) {
+  temp             = unlist(readRDS(gwas_ld_imputed_sumstats_by_ref_ld_file[i]))
+  results_temp     = c(temp,rep(NA,data_length-length(temp)))
+  gwas_ld_imputed_sumstats_by_ref_ld_results[,i]  = results_temp
+}
+
+#Reshape the data
+results = gwas_ld_imputed_sumstats_by_ref_ld_results
+colnames(results)[1:4] = divergence_time
+##Reshape the data table
+reshaped_results <- melt(data = results, variable.name = "divergence_time")
+
+fig_finemapped_d <- reshaped_results %>%
+  plot_ly(
+    x = ~reshaped_results$divergence_time,
+    y = ~reshaped_results$value,
+    split = ~divergence_time,
+    type = 'violin',
+    colors = (mypalette),
+    color = ~divergence_time,
+    box = list(
+      visible = T
+    ),
+    meanline = list(
+      visible = T
+    )
+  ) 
+
+fig_finemapped_d <- fig_finemapped_b %>%
+  layout(
+    xaxis = list(
+      title = "LD Panel used in FINEMAP Analys",
+      zeroline = FALSE,
+      showline = FALSE,
+      showticklabels = FALSE,
+      showgrid = FALSE
+    ),
+    yaxis = list(
+      title = "PP Weighted True Fraction in 95% Credible Set",
+      zeroline = F
+    ),
+    title = "Imputed GWAS (By Ref) Summary Statistics & GWAS LD Panel Fine-Mapping Calibration",
+    legend = list(title = list("Divergence Time"))
+  )
+fig_finemapped_d
+```
+
+
