@@ -1,0 +1,386 @@
+---
+title: "mle_plots"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Plot the generative model w noise
+```{r Noise MLE Generative}
+merged_results   = c()
+divergence_times = c(10,50,100)
+noise_values     = c(0.001,0.005,0.01)
+divergence_column_names = c()
+noise_column_names      = c()
+for (i in 1:length(divergence_times)) {
+  for (j in 1:length(noise_values)) {
+    #Read in the results file
+    file_names = list.files(path = "mle_results/gamma_noise", pattern = sprintf("noise_replicate_\\d+_dt_%s_noise_%s",divergence_times = divergence_times[i],noise = noise_values[j]), full.names = T)
+    #Load the data
+    results          = unlist((lapply(file_names,readRDS)))
+    #Get the column names
+    divergence_column_names = c(divergence_column_names,rep(divergence_times[i],length(results)))
+    noise_column_names      = c(noise_column_names,rep(noise_values[j],length(results)))
+    merged_results = c(merged_results,log10(results))
+  }
+}
+
+#Create the data.table of values
+noise_mle = data.table(noise_estimate = merged_results, divergence_time_value = divergence_column_names, noise_value = prettyNum(log10(noise_column_names),1), stringsAsFactors = FALSE)
+
+#Plot the grouped violin plots
+
+fig <- noise_mle %>%
+  plot_ly(type = 'violin')
+fig <- fig %>%
+  add_trace(
+    x = ~as.character(noise_mle[noise_mle$divergence_time_value == '10']$noise_value),
+    y = ~noise_estimate[noise_mle$divergence_time_value == '10'],
+    legendgroup = 'M',
+    scalegroup = 'M',
+    name = '10',
+    box = list(
+      visible = T
+    ),
+    meanline = list(
+      visible = T
+    ),
+    color = I("pink")
+  ) 
+
+fig <- fig %>%
+  add_trace(
+    x = ~as.character(noise_mle[noise_mle$divergence_time_value == '50']$noise_value),
+    y = ~noise_estimate[noise_mle$divergence_time_value == '50'],
+    legendgroup = 'M',
+    scalegroup = 'M',
+    name = '50',
+    box = list(
+      visible = T
+    ),
+    meanline = list(
+      visible = T
+    ),
+    color = I("green")
+  ) 
+
+fig <- fig %>%
+  add_trace(
+    x = ~as.character(noise_mle[noise_mle$divergence_time_value == '100']$noise_value),
+    y = ~noise_estimate[noise_mle$divergence_time_value == '100'],
+    legendgroup = 'M',
+    scalegroup = 'M',
+    name = '100',
+    box = list(
+      visible = T
+    ),
+    meanline = list(
+      visible = T
+    ),
+    color = I("blue")
+  ) 
+
+  fig <- fig %>% layout(
+    title = 'MLE of Noise',
+    yaxis = list(title = "MLE Estimate of log10 Noise"),
+    xaxis = list(
+      type = 'category',
+      title = 'Simulated log10 Noise'),violinmode = 'group')
+  fig
+
+```
+Fst results
+```{r Fst MLE Generative}
+  merged_results   = c()
+  divergence_times = c(10,50,100)
+  noise_values     = c(0.001,0.005,0.01)
+  divergence_column_names = c()
+  noise_column_names      = c()
+  for (i in 1:length(divergence_times)) {
+    for (j in 1:length(noise_values)) {
+      #Read in the results file
+      file_names = list.files(path = "mle_results/gamma_noise", pattern = sprintf("fst_replicate_\\d+_dt_%s_noise_%s",divergence_times = divergence_times[i],noise = noise_values[j]), full.names = T)
+      #Load the data
+      results          = unlist((lapply(file_names,readRDS)))
+      #Get the column names
+      divergence_column_names = c(divergence_column_names,rep(divergence_times[i],length(results)))
+      noise_column_names      = c(noise_column_names,rep(noise_values[j],length(results)))
+      merged_results = c(merged_results,log10(results))
+    }
+  }
+  
+  #Create the data.table of values
+  fst_mle = data.table(fst_estimate = merged_results, divergence_time_value = divergence_column_names, noise_value = prettyNum(log10(noise_column_names),3), stringsAsFactors = FALSE)
+  
+  #Plot the grouped violin plots
+  
+  fig <- fst_mle %>%
+    plot_ly(type = 'violin')
+  fig <- fig %>%
+    add_trace(
+      x = ~as.character(fst_mle[fst_mle$divergence_time_value == '10']$noise_value),
+      y = ~fst_estimate[fst_mle$divergence_time_value == '10'],
+      legendgroup = 'M',
+      scalegroup = 'M',
+      name = '10',
+      box = list(
+        visible = T
+      ),
+      meanline = list(
+        visible = T
+      ),
+      color = I("pink")
+    ) 
+  
+  fig <- fig %>%
+    add_trace(
+      x = ~as.character(fst_mle[fst_mle$divergence_time_value == '50']$noise_value),
+      y = ~fst_estimate[fst_mle$divergence_time_value == '50'],
+      legendgroup = 'M',
+      scalegroup = 'M',
+      name = '50',
+      box = list(
+        visible = T
+      ),
+      meanline = list(
+        visible = T
+      ),
+      color = I("green")
+    ) 
+  
+  fig <- fig %>%
+    add_trace(
+      x = ~as.character(fst_mle[fst_mle$divergence_time_value == '100']$noise_value),
+      y = ~fst_estimate[fst_mle$divergence_time_value == '100'],
+      legendgroup = 'M',
+      scalegroup = 'M',
+      name = '100',
+      box = list(
+        visible = T
+      ),
+      meanline = list(
+        visible = T
+      ),
+      color = I("blue")
+    ) 
+  
+  fig <- fig %>% layout(
+    title = 'MLE of Fst',
+    yaxis = list(title = "MLE Estimate of log10 Fst"),
+    xaxis = list(
+      type = 'category',
+      title = 'Simulated log10 Noise'),violinmode = 'group')
+  fig
+```
+
+```{r Fst MLE GLM}
+#Do this across all noise values TOGETHER
+#Therefor there will only be three violin plots here
+  merged_results   = c()
+  divergence_times = c(0,10,50,100)
+  divergence_column_names = c()
+  noise_column_names      = c()
+  for (i in 1:length(divergence_times)) {
+      #Read in the results file
+      file_names = list.files(path = "mle_results/glm_se", pattern = sprintf("fst_replicate_\\d+_dt_%s_",divergence_times = divergence_times[i]), full.names = T)
+      #Load the data
+      results          = unlist((lapply(file_names,readRDS)))
+      #Get the column names
+      divergence_column_names = c(divergence_column_names,rep(divergence_times[i],length(results)))
+      merged_results = c(merged_results,log10(results))
+}
+  
+  #Create the data.table of values
+  fst_mle = data.table(fst_estimate = merged_results, divergence_time_value = as.character(divergence_column_names), stringsAsFactors = FALSE)
+  fig <- fst_mle %>%
+  plot_ly(
+    x = ~divergence_time_value,
+    y = ~fst_estimate,
+    split = ~divergence_time_value,
+    type = 'violin',
+    box = list(
+      visible = T
+    ),
+    meanline = list(
+      visible = T
+    )
+  ) 
+
+fig <- fig %>%
+  layout(
+    xaxis = list(
+      title = "Divergence Time"
+    ),
+    yaxis = list(
+      title = "log10 Fst MLE Estimate",
+      zeroline = F
+    )
+  )
+
+fig = fig %>%  layout(title = "GWAS Linear Model Fst Estimation on Population Split Demographic History")
+fig
+```
+
+Plotting the OOA results now
+```{r}
+#Do this across all noise values TOGETHER
+#Therefor there will only be three violin plots here
+merged_results = c()
+ooa_column_names = c("CEU_GWAS_CHB_Ref","CEU_GWAS_YRI_Ref", "CHB_GWAS_YRI_Ref")
+for (i in 1:length(ooa_column_names)) {
+      #Read in the results file
+      file_names = list.files(path = "ooa_mle_results/", pattern = sprintf("fst_%s_replicate_",ooa_column_names = ooa_column_names[i]), full.names = T)
+      #Load the data
+      results          = unlist((lapply(file_names,readRDS)))
+      #Get the column names
+      ooa_column_names = c(ooa_column_names,rep(ooa_column_names[i],length(results)))
+      merged_results = c(merged_results,log10(results))
+}
+  
+  #Create the data.table of values
+  fst_mle = data.table(fst_estimate = merged_results, ooa_pairs = ooa_column_names , stringsAsFactors = FALSE)
+  fig <- fst_mle %>%
+  plot_ly(
+    x = ~ooa_pairs,
+    y = ~fst_estimate,
+    split = ~ooa_pairs,
+    type = 'violin',
+    box = list(
+      visible = T
+    ),
+    meanline = list(
+      visible = T
+    )
+  ) 
+
+fig <- fig %>%
+  layout(title = "Out of Africa Population Pairings with Linear Model GWAS Variances MLE",
+    xaxis = list(
+      title = "OOA Pair"
+    ),
+    yaxis = list(
+      title = "log10 Fst MLE Estimate",
+      zeroline = F
+    )
+  )
+
+fig
+```
+
+UKBB results
+```{r}
+#Do this across all noise values TOGETHER
+#Therefor there will only be three violin plots here
+merged_results = c()
+pop_names = c("AMR","AFR","EUR","SAS","EAS")
+pop_column_names = c()
+for (i in 1:length(pop_names)) {
+      #Read in the results file
+      file_names = list.files(path = "ukbb_mle_results/", pattern = sprintf("fst_%s_",pop_names[i]), full.names = T)
+      #Load the data
+      results          = unlist((lapply(file_names,readRDS)))
+      #Get the column names
+      pop_column_names = c(pop_column_names,rep(pop_names[i],length(results)))
+      merged_results = c(merged_results,log10(results))
+}
+  
+  #Create the data.table of values
+  fst_mle = data.table(fst_estimate = merged_results, pop_column_names = pop_column_names , stringsAsFactors = FALSE)
+  fig <- fst_mle %>%
+  plot_ly(
+    x = ~pop_column_names,
+    y = ~fst_estimate,
+    split = ~pop_column_names,
+    type = 'violin',
+    box = list(
+      visible = T
+    ),
+    meanline = list(
+      visible = T
+    )
+  ) 
+
+fig <- fig %>%
+  layout(title = "MLE of UKBB GWAS Summary Statistics with 1000G Reference Panels",
+    xaxis = list(
+      title = "1000G Super Population Reference Panel"
+    ),
+    yaxis = list(
+      title = "log10 Fst MLE",
+      zeroline = F
+    )
+  )
+
+fig
+```
+
+Generate the density plots to show the gamma noise term 
+```{r}
+#For this what we want is the pi_refs across the different 1000G super populations
+#Then match to the UKBB data
+#Read in the UKBB sumstats
+bolt_gwas_sumstats      = fread("/well/mcvean/ukbb12788/mtutert/test_genotyped_chr1", header = T)
+super_pops              = c("EUR","AMR","EAS","SAS","AFR")
+matched_pi_ref          = list() #List of the matched pi_refs across super pops
+matched_sumstats        = list() #List of the matched sumstats across super pops
+for (i in 1:length(super_pops)) {
+  #Extract out the rsIDs in this region:
+  bolt_snp_rsid = bolt_gwas_sumstats$SNP
+  #Read in KG freq file
+  KG_freq = fread(sprintf("sample_pops/%s_freq.afreq",super_pops[i]),header = T)
+
+  #Match the SNPs
+  KG_filtered   = KG_freq[which(KG_freq$ID %in% bolt_snp_rsid)]
+  bolt_filtered = bolt_gwas_sumstats[which(bolt_gwas_sumstats$SNP  %in% KG_filtered$ID)]
+
+  #Get the list of pi_ref freqs and SEs
+  pi_ref        = as.numeric(KG_filtered$ALT_FREQS)
+
+  bolt_se       = bolt_filtered$SE
+  #Remove rare variants in either population
+  pi_ref_low_freq = which(pi_ref > 0.99 | pi_ref < 0.01 | is.na(pi_ref))
+
+  if (length(pi_ref_low_freq) > 0 ) {
+    pi_ref  = pi_ref[-pi_ref_low_freq]
+    bolt_se = bolt_se[-pi_ref_low_freq] 
+  }
+  matched_pi_ref[[i]]    = pi_ref
+  matched_sumstats[[i]]  = bolt_se
+  
+  #Calculate mbar (do this manually for now, will change later)
+  #Convert SE^2 to quanitative scale (BOLT Quirk)
+  matched_sumstats[[i]]       = (matched_sumstats[[i]]/(0.2201582*(1-0.2201582)))^2
+}
+
+
+mbar                        = (2*361381*0.2201582*(1-0.2201582))
+#Do this w UKBB data
+ukbb_se       = (bolt_gwas_sumstats$SE/(0.2201582*(1-0.2201582)))^2
+ukbb_af       = bolt_gwas_sumstats$A1FREQ
+
+
+#Plot the densities
+density1 = density(matched_sumstats[[1]]/(1/(mbar*(matched_pi_ref[[1]]*(1-matched_pi_ref[[1]])))))
+density2 = density(matched_sumstats[[2]]/(1/(mbar*(matched_pi_ref[[2]]*(1-matched_pi_ref[[2]])))))
+density3 = density(matched_sumstats[[3]]/(1/(mbar*(matched_pi_ref[[3]]*(1-matched_pi_ref[[3]])))))
+density4 = density(matched_sumstats[[4]]/(1/(mbar*(matched_pi_ref[[4]]*(1-matched_pi_ref[[4]])))))
+density5 = density(matched_sumstats[[5]]/(1/(mbar*(matched_pi_ref[[5]]*(1-matched_pi_ref[[5]])))))
+density5 = density(matched_sumstats[[5]]/(1/(mbar*(matched_pi_ref[[5]]*(1-matched_pi_ref[[5]])))))
+density6 = density(ukbb_se/(1/(mbar*(ukbb_af*(1-ukbb_af)))),
+library(plotly)
+fig <- plot_ly(x = ~density1$x, y = ~density1$y, type = 'scatter', mode = 'lines', name = 'EUR')
+fig <- fig %>% add_trace(x = ~density2$x, y = ~density2$y, name = 'AMR')
+fig <- fig %>% add_trace(x = ~density3$x, y = ~density3$y, name = 'EAS')
+fig <- fig %>% add_trace(x = ~density4$x, y = ~density4$y, name = 'SAS')
+fig <- fig %>% add_trace(x = ~density5$x, y = ~density5$y, name = 'AFR')
+fig <- fig %>% add_trace(x = ~density6$x, y = ~density5$y, name = 'UKBB')
+
+fig <- fig %>% layout(title = "Impact of Noise and Drift in UK-Biobank GWAS",xaxis = list(title = 'Ratio of Observed to Implied Variances'),
+         yaxis = list(title = 'Density'))
+
+fig
+```
+
+

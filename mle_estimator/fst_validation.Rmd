@@ -1,0 +1,1453 @@
+---
+title: "fst_validation"
+output: html_document
+---
+
+Show what the density curve looks like
+```{r}
+#Describe the parameters that we are simulating our model underneath
+Fst    = 0.01 #Drift; we are trying to learn this parameter
+pi_ref   = 0.3 #Initial allele frequency
+c        = 1 / Fst - 1
+alpha    = c * ( pi_ref )
+beta     = (1 - pi_ref ) * c
+pi_pop   = rbeta(1,alpha,beta)
+#We do not have access to pi_pop, but we have access to the SD, which is equivalent to:
+SD = ( 1 / ( ( pi_pop ) * ( 1 - pi_pop ) ) ) #This will be a value between 4 to infinity
+#Find the mean of these SD's
+#SD = mean(SD)
+
+#Change of variables 
+integrand = function(x) {1 / ( ( x - 4 )^.5 * x ^ ( 3 / 2 ) ) * ( dbeta( ( 0.5 - ( ( x - 4 ) ^ .5 ) / ( 2 * ( x ) ^ .5 ) ) , alpha, beta ) +  
+                                                                  dbeta( ( 0.5 + ( ( x - 4 ) ^ .5 ) / ( 2 * ( x ) ^ .5 ) ) , alpha, beta ) ) }
+#Check integral sums to one
+#print(integrate( integrand, lower = 4, upper = Inf ) )
+#What does our likelihood look like?
+fig = plot_ly(data = as.data.frame(iris) , x =~seq(4,10,0.01), y =~integrand(seq(4,10,0.01)))
+fig =  fig %>% layout(title = "Density Curve for GWAS Variance", xaxis = list(title = "GWAS Variance Value"), yaxis = list(title = "Probability"))
+fig
+```
+
+
+First we want to look at what the likelihood curve might look like:
+```{r}
+#Describe the parameters that we are simulating our model underneath
+Fst    = seq(0.001,0.1,0.0001) #Drift; we are trying to learn this parameter
+pi_ref   = 0.3 #Initial allele frequency
+c        = 1 / Fst - 1
+alpha    = c * ( pi_ref )
+beta     = (1 - pi_ref ) * c
+pi_pop   = rbeta(1,alpha[820],beta[820])
+#We do not have access to pi_pop, but we have access to the SD, which is equivalent to:
+SD = ( 1 / ( ( pi_pop ) * ( 1 - pi_pop ) ) ) #This will be a value between 4 to infinity
+#Find the mean of these SD's
+#SD = mean(SD)
+
+#Change of variables 
+integrand = function(x) {1 / ( ( x - 4 )^.5 * x ^ ( 3 / 2 ) ) * ( dbeta( ( 0.5 - ( ( x - 4 ) ^ .5 ) / ( 2 * ( x ) ^ .5 ) ) , alpha, beta ) +  
+                                                                  dbeta( ( 0.5 + ( ( x - 4 ) ^ .5 ) / ( 2 * ( x ) ^ .5 ) ) , alpha, beta ) ) }
+#Check integral sums to one
+#print(integrate( integrand, lower = 4, upper = Inf ) )
+x = Fst
+#What does our likelihood look like?
+fig = plot_ly(data = as.data.frame(iris) , x =~ Fst, y =~ integrand(SD))
+fig =  fig %>% layout(title = "Likelihood Curve", xaxis = list(title = "Fst"), yaxis = list(title = "Likelihood"))
+fig
+```
+
+Test the accuracy of the MLE
+```{r}
+#Generate 1000 different Fsts from uniform distribution
+Fst_values = runif(n = 1000, min = 1e-3,0.1)
+n          = 1000
+
+#Get likelihood function
+Likelihood = function(Fst,se,pi_ref){
+  LL = c()
+  #Loop across each variants
+  for (i in 1:length(se)) {
+  c            = 1 / Fst - 1
+  alpha        = c * ( pi_ref )
+  beta         = (1 - pi_ref ) * c
+  LL[i] = log( 1 / ( ( se[i] - 4 )^.5 * se[i] ^ ( 3 / 2 ) ) ) + log( ( dbeta( ( 0.5 - ( ( se[i] - 4 ) ^ .5 ) / ( 2 * ( se[i] ) ^ .5 ) ) , alpha[i], beta[i] ) +
+                                                                       dbeta( ( 0.5 + ( ( se[i] - 4 ) ^ .5 ) / ( 2 * ( se[i] ) ^ .5 ) ) , alpha[i], beta[i] ) ) )
+  }
+  return(sum(LL))
+}
+# 
+# optimise(f = Likelihood, se = se , pi_ref = pi_ref, interval = c(1e-4, 0.1), maximum = TRUE)
+#Loop through the values
+
+
+mle_fst = c()
+for (i in 1:length(Fst_values)) {
+  #Generate and loop through each dataset
+  pi_ref   = runif(n,0,1) #Initial allele frequency
+  c        = 1 / Fst_values[i] - 1
+  alpha    = c * ( pi_ref )
+  beta     = (1 - pi_ref ) * c
+  pi_pop   = rbeta(n,alpha,beta)
+  #Remove any values that are too high/low!
+  low_freq_variants = which(pi_pop < 0.01 | pi_pop > 0.99)
+  if (length(low_freq_variants)>0) {
+      pi_pop = pi_pop[-low_freq_variants]
+      pi_ref = pi_ref[-low_freq_variants]
+  }
+  #Remove the pi_refs as well
+  
+  #We do not have access to pi_pop, but we have access to the SD, which is equivalent to:
+  se         = 1 / ( ( pi_pop ) * ( 1 - pi_pop ) ) #This will be a value between 4 to infinity
+  mle_fst[i] = optimise(f = Likelihood, se = se, pi_ref = pi_ref, interval = c(1e-3, 0.1), maximum = TRUE)$maximum
+}
+fig = plot_ly(data = as.data.frame(iris) , x =~ Fst_values, y =~ mle_fst)
+fig =  fig %>% layout(title = "MLE of Genetic Drift Accuracy ", xaxis = list(title = "True Fst"), yaxis = list(title = "Estimated Fst"))
+fig
+
+```
+
+
+
+```{r}
+#Create likelihood function 
+gamma_likelihood = function(pars,se,pi_ref) {
+  #Number of datapoints, is length of o_sd
+  n      = length(se)
+  #Set variables
+  c      = 1 / pars[1] - 1
+  alpha  = c * ( pi_ref )
+  beta   = ( 1 - pi_ref ) * c
+  
+  #Define the marginal likelihood function (which will we then integrate)
+  marginal = function(z, 
+                      se,
+                      alpha, 
+                      beta,
+                      noise){
+    log_result = log( 1 / ( ( z^-1*se - 4 )^.5 * z^-1*se ^ ( 3 / 2 ) ) ) +
+    log( ( dbeta( ( 0.5 - ( ( z^-1*se - 4 ) ^ .5 ) / ( 2 * ( z^-1*se ) ^ .5 ) ) , alpha, beta ) +  
+             dbeta( ( 0.5 + ( ( z^-1*se - 4 ) ^ .5 ) / ( 2 * ( z^-1*se ) ^ .5 ) ) , alpha, beta ) ) ) + 
+    dgamma( z, shape = 1 / pars[2], scale = pars[2], log = TRUE) +
+    log( z^-1 )
+    
+    return(exp(log_result))
+  }
+
+  
+  Likelihood = c()
+  #Calculate the likelihood across each observation
+  for (i in 1:n) {
+      #Integrate out this nuissance term
+      #Create a check to figure out where the lower bound should be
+      #Likelihood[i] = integral(fun = marginal, xmin = 0, xmax = se[i]/4, se = se[i], alpha = alpha[i], beta = beta[i], no_intervals = 8)
+      lower_bound = 0
+      while (length(Likelihood) == (i-1)) {
+        dat = try(expr = integrate(f = marginal, lower = lower_bound, upper = se[i]/4, se = se[i], alpha = alpha[i], beta = beta[i]),silent = TRUE)
+        if(class(dat) != "try-error"){
+        Likelihood[i] = integrate(f = marginal, lower = lower_bound, upper = se[i]/4, se = se[i], alpha = alpha[i], beta = beta[i])$value
+        }
+        else{
+          lower_bound = lower_bound + 0.01}
+      }
+  }
+  #print(Likelihood)
+  Likelihood = Likelihood[!is.na(Likelihood) & !is.infinite(Likelihood)]
+  return(-sum(log(Likelihood)))
+}
+
+
+Fst   = 0.01
+noise = 0.01
+pi_ref = runif(1,0.05,.95)
+c           = 1 / Fst - 1
+alpha       = c * ( pi_ref )
+beta        = (1 - pi_ref ) * c
+pi_pop      = rbeta(1,alpha,beta)
+#Remove variants below a certain frequency
+se          = ( 1 / ( ( pi_pop ) * ( 1 - pi_pop ) ) )
+#Add the gamma noise
+noisy_se    = rgamma(1, shape = 1 / noise, scale = noise) * se
+
+#Plot the 3D surface
+Fst   = seq(0.001,0.1,0.01)
+noise = seq(0.001,0.1,0.01)
+
+#Create a datatable to store the 3D surface results
+likelihood = matrix(data = NA, nrow = length(Fst), ncol = length(noise))
+counter = 1
+for (i in 1:length(Fst)) {
+  for (j in 1:length(noise)) {
+      likelihood[i,j] <- -gamma_likelihood(pars = c(Fst[i],noise[j]),se = noisy_se,pi_ref = pi_ref)
+      print(counter)
+      counter = counter + 1
+  }
+}
+
+fig = plot_ly(x = Fst, y = noise, z = likelihood) %>% add_surface()
+fig <- fig %>% layout(title = "Log-Likelihood Surface", scene = list(xaxis=list(title = "Fst"),yaxis=list(title = "Noise"),zaxis = list(title = "Log Likelihood")))
+fig
+```
+
+Add in some multiplicative gamma noise (Z = XY) and check out the joint inference
+
+```{r}
+#Create likelihood function 
+gamma_likelihood = function(pars,se,pi_ref) {
+  #Number of datapoints, is length of o_sd
+  n      = length(se)
+  #Set variables
+  c      = 1 / pars[1] - 1
+  alpha  = c * ( pi_ref )
+  beta   = ( 1 - pi_ref ) * c
+  
+  #Define the marginal likelihood function (which will we then integrate)
+  marginal = function(z, 
+                      se,
+                      alpha, 
+                      beta,
+                      noise){
+    log_result = log( 1 / ( ( z^-1*se - 4 )^.5 * z^-1*se ^ ( 3 / 2 ) ) ) +
+    log( ( dbeta( ( 0.5 - ( ( z^-1*se - 4 ) ^ .5 ) / ( 2 * ( z^-1*se ) ^ .5 ) ) , alpha, beta ) +  
+             dbeta( ( 0.5 + ( ( z^-1*se - 4 ) ^ .5 ) / ( 2 * ( z^-1*se ) ^ .5 ) ) , alpha, beta ) ) ) + 
+    dgamma( z, shape = 1 / pars[2], scale = pars[2], log = TRUE) +
+    log( z^-1 )
+    
+    return(exp(log_result))
+  }
+
+  
+  Likelihood = c()
+  #Calculate the likelihood across each observation
+  for (i in 1:n) {
+      #Integrate out this nuissance term
+      #Create a check to figure out where the lower bound should be
+      #Likelihood[i] = integral(fun = marginal, xmin = 0, xmax = se[i]/4, se = se[i], alpha = alpha[i], beta = beta[i], no_intervals = 8)
+      lower_bound = 0
+      while (length(Likelihood) == (i-1)) {
+        dat = try(expr = integrate(f = marginal, lower = lower_bound, upper = se[i]/4, se = se[i], alpha = alpha[i], beta = beta[i]),silent = TRUE)
+        if(class(dat) != "try-error"){
+        Likelihood[i] = integrate(f = marginal, lower = lower_bound, upper = se[i]/4, se = se[i], alpha = alpha[i], beta = beta[i])$value
+        }
+        else{
+          lower_bound = lower_bound + 0.01}
+      }
+  }
+  #print(Likelihood)
+  Likelihood = Likelihood[!is.na(Likelihood) & !is.infinite(Likelihood)]
+  return(-sum(log(Likelihood)))
+}
+
+n_obs        = 100 #Number of observations
+n_reps       = 1000
+Fst_values   = runif(n_reps,0.001,0.1)
+input_noise  = runif(n_reps,0.001,0.1)
+mle_fst      = c()
+mle_noise    = c()
+for (i in 1:n_reps) {
+  print(i)
+  #Generative data
+  pi_ref = runif(n_obs,0.05,.95)
+  c           = 1 / Fst_values[i] - 1
+  alpha       = c * ( pi_ref )
+  beta        = (1 - pi_ref ) * c
+  pi_pop      = rbeta(n_obs,alpha,beta)
+  #Remove variants below a certain frequency
+  low_freq_variants = which(pi_pop < 0.05 | pi_pop > 0.95)
+  if (length(low_freq_variants) > 0) {
+      pi_pop = pi_pop[-low_freq_variants]
+      pi_ref = pi_ref[-low_freq_variants]
+  }
+  #Transform to se's
+  se          = ( 1 / ( ( pi_pop ) * ( 1 - pi_pop ) ) )
+  #Add the gamma noise
+  noisy_se    = rgamma(length(pi_pop), shape = 1 / input_noise[i], scale = input_noise[i]) * se
+  parameters_inferred = optim(par = c( 0.05 ,0.05), fn = gamma_likelihood, se = noisy_se, pi_ref = pi_ref, lower = c( 0.001,0.001), upper = c( 0.1, 0.1), method = "L-BFGS-B")$par
+  mle_fst[i]   = parameters_inferred[1]
+  mle_noise[i] = parameters_inferred[2]
+}
+
+fig = plot_ly(data = as.data.frame(iris) , x =~ Fst_values[1:816], y =~ mle_fst[1:816])
+fig =  fig %>% layout(title = "Joint MLE Genetic Drift Accuracy ", xaxis = list(title = "True Fst"), yaxis = list(title = "Estimated Fst"))
+fig
+
+fig = plot_ly(data = as.data.frame(iris) , x =~ input_noise[1:816], y =~ mle_noise[1:816])
+fig =  fig %>% layout(title = "Joint MLE Noise Accuracy ", xaxis = list(title = "True Noise"), yaxis = list(title = "Estimated Noise"))
+fig
+
+
+```
+DON"T NEED ANYTHING BELOW HERE
+
+
+```{r}
+library(plotly)
+library( data.table)
+
+########Different Levels of Fst##########
+#Start of by defining the constants that we are simulatig this data underneath
+#Change Fst from 0.01 to .2, with 20 data points
+#Number of replicates
+replicates = 100
+Fst = rep(0.01,replicates)
+# Initial empty lists to store results to do the proper optimization
+o_sd_input   = list()
+pi_ref_input = list()
+
+# Now the new experiments
+for(i in seq(Fst[1:length(Fst)])){
+  #Start of by defining the constants that we are simulatig this data underneath
+  n = 100 #Number of SNPs in the model
+  pi_ref = runif( n, 0.1, 0.4) #Initial allele frequency
+  c = 1 / Fst[i] - 1
+  alpha = c * ( pi_ref )
+  beta = ( 1 - pi_ref ) * c
+  pi_pop = rbeta(n, alpha, beta )
+  
+  #Trim the pi_pops's because some may be extremely low, we will put on a cap at 0.1% allele frequency for these
+  #This means we will also need to trim the corresponding alpha's and beta's accordingly, within the right indexes
+  limit = 0.01
+  remove_index = which(pi_pop < limit)
+  
+  #Do this only is remove_index actually has elements
+  if (length(remove_index)>0) {
+    pi_pop <- pi_pop[pi_pop> limit]
+    
+    #Remove the pi_ref's that need to go 
+    pi_ref = pi_ref[-remove_index]
+  }
+  
+  #True SD's, without any noise, using the filter from above
+  Y = 1 / ( pi_pop * ( 1 - pi_pop ) )
+  
+  #Set noise  parameters and draw from the gamma pdf
+  #Set shape to 1, and scale to whatever is the Y
+  #Shape * Scale = mean, 1*scale = mean, 1*Y = Y
+  
+  var = 0.035
+  
+  #Store required values to perform optimizations in this list
+  o_sd_input[[length(o_sd_input)+1]]     = list(rgamma( length(pi_pop), shape = 1 / var, scale = var) * Y)
+  pi_ref_input[[length(pi_ref_input)+1]] = list(pi_ref)
+  
+}
+
+
+LL_Gamma = function( Fst, o_sd, pi_ref, var) {
+  #Number of datapoints, is length of o_sd
+  n = length(o_sd)
+  #Set variables
+  c = 1 / Fst - 1
+  alpha_v = c * ( pi_ref )
+  beta_v = ( 1 - pi_ref ) * c
+  
+  #Assume that we know the level of noise beforehand, and we don't want to infer it for now...
+  o_sd_v = o_sd 
+  #Set integral bounds
+  upper_v = o_sd_v / 4
+  
+  #Set up integral, do the change of variables such that Y_obs = Y*Z
+  marginal = function(z, o_sd, alpha, beta) {log_result = log( 1 / ( ( z^-1*o_sd - 4 )^.5 * z^-1*o_sd ^ ( 3 / 2 ) ) ) +
+    log( ( dbeta( ( 0.5 - ( ( z^-1*o_sd - 4 ) ^ .5 ) / ( 2 * ( z^-1*o_sd ) ^ .5 ) ) , alpha, beta ) +  
+             dbeta( ( 0.5 + ( ( z^-1*o_sd - 4 ) ^ .5 ) / ( 2 * ( z^-1*o_sd ) ^ .5 ) ) , alpha, beta ) ) ) + 
+    dgamma( z, shape = 1 / var, scale = var, log = TRUE) +
+    log( z^-1 )
+  
+  
+  return(exp(log_result)) }
+  
+  Likelihood = NULL
+  
+  for (i in 1:n) {
+    Likelihood[i] = integrate( marginal, lower = c(0), upper = upper_v[i], o_sd = o_sd_v[i], alpha = alpha_v[i], beta = beta_v[i] )$value
+  }
+  
+  Log_Likelihood = sum( log( Likelihood))
+  return (Log_Likelihood )
+}
+
+#Variance we are adjusting along
+var_factor_adjusted = c(0.4,0.7,1,1.5,2)
+x = as.data.frame(log(var_factor_adjusted))
+
+#Fst 0.01
+model_res_001 = matrix(nrow = length(var_factor_adjusted), ncol = length(Fst)) #Store results
+for (i in seq(var_factor_adjusted)) { 
+  for (j in seq(Fst)) {
+    model_res_001[i,j] = optimise( f = LL_Gamma, o_sd = unlist( o_sd_input[[j]] ), pi_ref = unlist(pi_ref_input[[j]]), interval = c( 1e-4, 0.999 ), var = var_factor_adjusted[i]*var, maximum = TRUE  )$maximum
+  }
+}
+
+Fst_001 = model_res_001/0.01
+Fst_001 = rowMeans(Fst_001)
+
+LL_001 = matrix(nrow = length(var_factor_adjusted), ncol = length(Fst)) #Store results
+for (i in seq(var_factor_adjusted)) { 
+  for (j in seq(Fst)) {
+    LL_001[i,j] = LL_Gamma( Fst = model_res_001[i,j], o_sd = unlist( o_sd_input[[j]] ), pi_ref = unlist(pi_ref_input[[j]]) , var = var_factor_adjusted[i]*var )
+  }
+}
+
+Log_Likelihood_001 = rowMeans(LL_001)
+
+#Fst 0.05 
+#Start of by defining the constants that we are simulatig this data underneath
+#Change Fst from 0.01 to .2, with 20 data points
+#Number of replicates
+replicates = 100
+Fst = rep(0.05,replicates)
+# Initial empty lists to store results to do the proper optimization
+o_sd_input   = list()
+pi_ref_input = list()
+
+# Now the new experiments
+for(i in seq(Fst[1:length(Fst)])){
+  #Start of by defining the constants that we are simulatig this data underneath
+  n = 500 #Number of SNPs in the model
+  pi_ref = runif( n, 0.1, 0.4) #Initial allele frequency
+  c = 1 / Fst[i] - 1
+  alpha = c * ( pi_ref )
+  beta = ( 1 - pi_ref ) * c
+  pi_pop = rbeta(n, alpha, beta )
+  
+  #Trim the pi_pops's because some may be extremely low, we will put on a cap at 0.1% allele frequency for these
+  #This means we will also need to trim the corresponding alpha's and beta's accordingly, within the right indexes
+  limit = 0.01
+  remove_index = which(pi_pop < limit)
+  
+  #Do this only is remove_index actually has elements
+  if (length(remove_index)>0) {
+    pi_pop <- pi_pop[pi_pop> limit]
+    
+    #Remove the pi_ref's that need to go 
+    pi_ref = pi_ref[-remove_index]
+  }
+  
+  #True SD's, without any noise, using the filter from above
+  Y = 1 / ( pi_pop * ( 1 - pi_pop ) )
+  
+  #Set noise  parameters and draw from the gamma pdf
+  #Set shape to 1, and scale to whatever is the Y
+  #Shape * Scale = mean, 1*scale = mean, 1*Y = Y
+  
+  var = 0.035
+  
+  #Store required values to perform optimizations in this list
+  o_sd_input[[length(o_sd_input)+1]]     = list(rgamma( length(pi_pop), shape = 1 / var, scale = var) * Y)
+  pi_ref_input[[length(pi_ref_input)+1]] = list(pi_ref)
+  
+}
+model_res_005 = matrix(nrow = length(var_factor_adjusted), ncol = length(Fst)) #Store results
+for (i in seq(var_factor_adjusted)) { 
+  for (j in seq(Fst)) {
+    model_res_005[i,j] = optimise( f = LL_Gamma, o_sd = unlist( o_sd_input[[j]] ), pi_ref = unlist(pi_ref_input[[j]]), interval = c( 1e-4, 0.999 ), var = var_factor_adjusted[i]*var, maximum = TRUE  )$maximum
+  }
+}
+
+Fst_005 = model_res_005/0.05
+Fst_005 = rowMeans(Fst_005)
+
+LL_005 = matrix(nrow = length(var_factor_adjusted), ncol = length(Fst)) #Store results
+for (i in seq(var_factor_adjusted)) { 
+  for (j in seq(Fst)) {
+    LL_005[i,j] = LL_Gamma( Fst = model_res_005[i,j], o_sd = unlist( o_sd_input[[j]] ), pi_ref = unlist(pi_ref_input[[j]]) , var = var_factor_adjusted[i]*var )
+  }
+}
+
+Log_Likelihood_005 = rowMeans(LL_005)
+
+#Fst 0.1 
+#Start of by defining the constants that we are simulatig this data underneath
+#Change Fst from 0.01 to .2, with 20 data points
+#Number of replicates
+replicates = 100
+Fst = rep(0.1,replicates)
+# Initial empty lists to store results to do the proper optimization
+o_sd_input   = list()
+pi_ref_input = list()
+
+# Now the new experiments
+for(i in seq(Fst[1:length(Fst)])){
+  #Start of by defining the constants that we are simulatig this data underneath
+  n = 500 #Number of SNPs in the model
+  pi_ref = runif( n, 0.1, 0.4) #Initial allele frequency
+  c = 1 / Fst[i] - 1
+  alpha = c * ( pi_ref )
+  beta = ( 1 - pi_ref ) * c
+  pi_pop = rbeta(n, alpha, beta )
+  
+  #Trim the pi_pops's because some may be extremely low, we will put on a cap at 0.1% allele frequency for these
+  #This means we will also need to trim the corresponding alpha's and beta's accordingly, within the right indexes
+  limit = 0.01
+  remove_index = which(pi_pop < limit)
+  
+  #Do this only is remove_index actually has elements
+  if (length(remove_index)>0) {
+    pi_pop <- pi_pop[pi_pop> limit]
+    
+    #Remove the pi_ref's that need to go 
+    pi_ref = pi_ref[-remove_index]
+  }
+  
+  #True SD's, without any noise, using the filter from above
+  Y = 1 / ( pi_pop * ( 1 - pi_pop ) )
+  
+  #Set noise  parameters and draw from the gamma pdf
+  #Set shape to 1, and scale to whatever is the Y
+  #Shape * Scale = mean, 1*scale = mean, 1*Y = Y
+  
+  var = 0.035
+  
+  #Store required values to perform optimizations in this list
+  o_sd_input[[length(o_sd_input)+1]]     = list(rgamma( length(pi_pop), shape = 1 / var, scale = var) * Y)
+  pi_ref_input[[length(pi_ref_input)+1]] = list(pi_ref)
+  
+}
+model_res_01 = matrix(nrow = length(var_factor_adjusted), ncol = length(Fst)) #Store results
+for (i in seq(var_factor_adjusted)) { 
+  for (j in seq(Fst)) {
+    model_res_01[i,j] = optimise( f = LL_Gamma, o_sd = unlist( o_sd_input[[j]] ), pi_ref = unlist(pi_ref_input[[j]]), interval = c( 1e-4, 0.999 ), var = var_factor_adjusted[i]*var, maximum = TRUE  )$maximum
+  }
+}
+
+Fst_01 = model_res_01/0.1
+Fst_01 = rowMeans(Fst_01)
+
+LL_01 = matrix(nrow = length(var_factor_adjusted), ncol = length(Fst)) #Store results
+for (i in seq(var_factor_adjusted)) { 
+  for (j in seq(Fst)) {
+    LL_01[i,j] = LL_Gamma( Fst = model_res_01[i,j], o_sd = unlist( o_sd_input[[j]] ), pi_ref = unlist(pi_ref_input[[j]]) , var = var_factor_adjusted[i]*var )
+  }
+}
+
+Log_Likelihood_01 = rowMeans(LL_01)
+
+####Plot this shit
+Fst_Var_Optim = plot_ly(data = x, x =~ x$`log(var_factor_adjusted)`, y = Fst_01, type = "scatter", mode = 'lines+markers', name = '0.1') %>%
+            add_trace(y = ~Fst_005, name = '0.05', type = "scatter", mode = 'lines+markers') %>%
+            add_trace(y = ~Fst_001, name = '0.001', type = "scatter",mode = 'lines+markers')
+
+Fst_Var_LL = plot_ly(data = x, x =~ x$`log(var_factor_adjusted)`, y = Log_Likelihood_01, type = "scatter", mode = 'lines+markers', name = '0.1') %>%
+                    add_trace(y = ~Log_Likelihood_005, name = '0.05', type = "scatter", mode = 'lines+markers') %>%
+                    add_trace(y = ~Log_Likelihood_001, name = '0.001', type = "scatter", mode = 'lines+markers')
+
+#####Different levels of Variance#####
+#Var = 0.01
+#Keep Fst constant at 0.05
+#Start of by defining the constants that we are simulatig this data underneath
+#Number of replicates
+replicates = 100
+Fst = 0.05
+var = rep(0.01,100)
+
+# Initial empty lists to store results to do the proper optimization
+o_sd_input   = list()
+pi_ref_input = list()
+
+#Give different levels of variance
+# Now the new experiments
+for(i in seq(var[1:length(var)])){
+  #Start of by defining the constants that we are simulatig this data underneath
+  n = 500 #Number of SNPs in the model
+  pi_ref = runif( n, 0.1, 0.4) #Initial allele frequency
+  c = 1 / Fst - 1
+  alpha = c * ( pi_ref )
+  beta = ( 1 - pi_ref ) * c
+  pi_pop = rbeta(n, alpha, beta )
+  
+  #Trim the pi_pops's because some may be extremely low, we will put on a cap at 0.1% allele frequency for these
+  #This means we will also need to trim the corresponding alpha's and beta's accordingly, within the right indexes
+  limit = 0.01
+  remove_index = which(pi_pop < limit)
+  
+  #Do this only is remove_index actually has elements
+  if (length(remove_index)>0) {
+    pi_pop <- pi_pop[pi_pop> limit]
+    
+    #Remove the pi_ref's that need to go 
+    pi_ref = pi_ref[-remove_index]
+  }
+  
+  #True SD's, without any noise, using the filter from above
+  Y = 1 / ( pi_pop * ( 1 - pi_pop ) )
+  
+  #Set noise  parameters and draw from the gamma pdf
+  #Set shape to 1, and scale to whatever is the Y
+  #Shape * Scale = mean, 1*scale = mean, 1*Y = Y
+  #Store required values to perform optimizations in this list
+  o_sd_input[[length(o_sd_input)+1]]     = list(rgamma( length(pi_pop), shape = 1 / var, scale = var) * Y)
+  pi_ref_input[[length(pi_ref_input)+1]] = list(pi_ref)
+}
+
+#Test the model
+model_var_001 = matrix(nrow = length(var_factor_adjusted), ncol = length(var)) #Store results
+for (i in seq(var_factor_adjusted)) { 
+  for (j in seq(var)) {
+    model_var_001[i,j] = optimise( f = LL_Gamma, o_sd = unlist( o_sd_input[[j]] ), pi_ref = unlist(pi_ref_input[[j]]), interval = c( 1e-4, 0.999 ), var = var_factor_adjusted[i]*var[j], maximum = TRUE  )$maximum
+  }
+}
+
+LL_var_01 = matrix(nrow = length(var_factor_adjusted), ncol = length(var)) #Store results
+for (i in seq(var_factor_adjusted)) { 
+  for (j in seq(var)) {
+    LL_var_01[i,j] = LL_Gamma( Fst = model_var_001[i,j], o_sd = unlist( o_sd_input[[j]] ), pi_ref = unlist(pi_ref_input[[j]]) , var = var_factor_adjusted[i]*var[i] )
+  }
+}
+
+Var_01 = model_var_001/0.05
+Var_01 = rowMeans(Var_01)
+LL_var_01 = rowMeans(LL_var_01)
+
+#Var = 0.05
+#Keep Fst constant at 0.05
+#Start of by defining the constants that we are simulatig this data underneath
+#Number of replicates
+replicates = 100
+Fst = 0.05
+var = rep(0.05,100)
+
+# Initial empty lists to store results to do the proper optimization
+o_sd_input   = list()
+pi_ref_input = list()
+
+#Give different levels of variance
+# Now the new experiments
+for(i in seq(var[1:length(var)])){
+  #Start of by defining the constants that we are simulatig this data underneath
+  n = 500 #Number of SNPs in the model
+  pi_ref = runif( n, 0.1, 0.4) #Initial allele frequency
+  c = 1 / Fst - 1
+  alpha = c * ( pi_ref )
+  beta = ( 1 - pi_ref ) * c
+  pi_pop = rbeta(n, alpha, beta )
+  
+  #Trim the pi_pops's because some may be extremely low, we will put on a cap at 0.1% allele frequency for these
+  #This means we will also need to trim the corresponding alpha's and beta's accordingly, within the right indexes
+  limit = 0.01
+  remove_index = which(pi_pop < limit)
+  
+  #Do this only is remove_index actually has elements
+  if (length(remove_index)>0) {
+    pi_pop <- pi_pop[pi_pop> limit]
+    
+    #Remove the pi_ref's that need to go 
+    pi_ref = pi_ref[-remove_index]
+  }
+  
+  #True SD's, without any noise, using the filter from above
+  Y = 1 / ( pi_pop * ( 1 - pi_pop ) )
+  
+  #Set noise  parameters and draw from the gamma pdf
+  #Set shape to 1, and scale to whatever is the Y
+  #Shape * Scale = mean, 1*scale = mean, 1*Y = Y
+  #Store required values to perform optimizations in this list
+  o_sd_input[[length(o_sd_input)+1]]     = list(rgamma( length(pi_pop), shape = 1 / var, scale = var) * Y)
+  pi_ref_input[[length(pi_ref_input)+1]] = list(pi_ref)
+}
+
+#Test the model
+model_var_005 = matrix(nrow = length(var_factor_adjusted), ncol = length(var)) #Store results
+for (i in seq(var_factor_adjusted)) { 
+  for (j in seq(var)) {
+    model_var_005[i,j] = optimise( f = LL_Gamma, o_sd = unlist( o_sd_input[[j]] ), pi_ref = unlist(pi_ref_input[[j]]), interval = c( 1e-4, 0.999 ), var = var_factor_adjusted[i]*var[j], maximum = TRUE  )$maximum
+  }
+}
+
+LL_var_005 = matrix(nrow = length(var_factor_adjusted), ncol = length(var)) #Store results
+for (i in seq(var_factor_adjusted)) { 
+  for (j in seq(var)) {
+    LL_var_005[i,j] = LL_Gamma( Fst = model_var_005[i,j], o_sd = unlist( o_sd_input[[j]] ), pi_ref = unlist(pi_ref_input[[j]]) , var = var_factor_adjusted[i]*var[i] )
+  }
+}
+
+Var_005 = model_var_005/0.05
+Var_005 = rowMeans(Var_005)
+LL_var_005 = rowMeans(LL_var_005)
+
+#Var = 0.1
+#Keep Fst constant at 0.05
+#Start of by defining the constants that we are simulatig this data underneath
+#Number of replicates
+replicates = 100
+Fst = 0.05
+var = rep(0.1,100)
+
+# Initial empty lists to store results to do the proper optimization
+o_sd_input   = list()
+pi_ref_input = list()
+
+#Give different levels of variance
+# Now the new experiments
+for(i in seq(var[1:length(var)])){
+  #Start of by defining the constants that we are simulatig this data underneath
+  n = 500 #Number of SNPs in the model
+  pi_ref = runif( n, 0.1, 0.4) #Initial allele frequency
+  c = 1 / Fst - 1
+  alpha = c * ( pi_ref )
+  beta = ( 1 - pi_ref ) * c
+  pi_pop = rbeta(n, alpha, beta )
+  
+  #Trim the pi_pops's because some may be extremely low, we will put on a cap at 0.1% allele frequency for these
+  #This means we will also need to trim the corresponding alpha's and beta's accordingly, within the right indexes
+  limit = 0.01
+  remove_index = which(pi_pop < limit)
+  
+  #Do this only is remove_index actually has elements
+  if (length(remove_index)>0) {
+    pi_pop <- pi_pop[pi_pop> limit]
+    
+    #Remove the pi_ref's that need to go 
+    pi_ref = pi_ref[-remove_index]
+  }
+  
+  #True SD's, without any noise, using the filter from above
+  Y = 1 / ( pi_pop * ( 1 - pi_pop ) )
+  
+  #Set noise  parameters and draw from the gamma pdf
+  #Set shape to 1, and scale to whatever is the Y
+  #Shape * Scale = mean, 1*scale = mean, 1*Y = Y
+  #Store required values to perform optimizations in this list
+  o_sd_input[[length(o_sd_input)+1]]     = list(rgamma( length(pi_pop), shape = 1 / var, scale = var) * Y)
+  pi_ref_input[[length(pi_ref_input)+1]] = list(pi_ref)
+}
+
+#Test the model
+model_var_1 = matrix(nrow = length(var_factor_adjusted), ncol = length(var)) #Store results
+for (i in seq(var_factor_adjusted)) { 
+  for (j in seq(var)) {
+    model_var_1[i,j] = optimise( f = LL_Gamma, o_sd = unlist( o_sd_input[[j]] ), pi_ref = unlist(pi_ref_input[[j]]), interval = c( 1e-4, 0.999 ), var = var_factor_adjusted[i]*var[j], maximum = TRUE  )$maximum
+  }
+}
+
+LL_var_1 = matrix(nrow = length(var_factor_adjusted), ncol = length(var)) #Store results
+for (i in seq(var_factor_adjusted)) { 
+  for (j in seq(var)) {
+    LL_var_1[i,j] = LL_Gamma( Fst = model_var_1[i,j], o_sd = unlist( o_sd_input[[j]] ), pi_ref = unlist(pi_ref_input[[j]]) , var = var_factor_adjusted[i]*var[i] )
+  }
+}
+
+Var_1 = model_var_1/0.05
+Var_1 = rowMeans(Var_1)
+LL_var_1 = rowMeans(LL_var_1)
+
+####Plot this shit
+Var_Optim = plot_ly(data = x, x =~ x$`log(var_factor_adjusted)`, y = Var_01, type = "scatter", name = '1%', mode = 'lines+markers') %>%
+  add_trace(y = ~Var_005, name = '5%', type = "scatter", mode = 'lines+markers') %>%
+  add_trace(y = ~Var_1, name = '10%', type = "scatter", mode = 'lines+markers')
+
+Var_LL = plot_ly(data = x, x =~ x$`log(var_factor_adjusted)`, y =~LL_var_01, type = "scatter", name = '1%', mode = 'lines+markers') %>%
+  add_trace(y = ~LL_var_005, name = '5%', type = "scatter", mode = 'lines+markers') %>%
+  add_trace(y = ~LL_var_1, name = '10%', type = "scatter", mode = 'lines+markers')
+
+#####Different Spreads of the pi_ref######
+#Pi_Ref_lower_bound = 0.1
+
+#Keep Fst constant at 0.05
+#Start of by defining the constants that we are simulatig this data underneath
+#Number of replicates
+replicates = 100
+Fst = 0.05
+var = 0.035
+
+#Adjust the pi_ref range 
+pi_ref_lower_bound = rep(0.1,replicates)
+
+# Initial empty lists to store results to do the proper optimization
+o_sd_input   = list()
+pi_ref_input = list()
+
+#Give different levels of variance
+# Now the new experiments
+for(i in seq(pi_ref_lower_bound[1:length(pi_ref_lower_bound)])){
+  #Start of by defining the constants that we are simulatig this data underneath
+  n = 500 #Number of SNPs in the model
+  pi_ref = runif( n, pi_ref_lower_bound[i], 0.4) #Initial allele frequency
+  c = 1 / Fst - 1
+  alpha = c * ( pi_ref )
+  beta = ( 1 - pi_ref ) * c
+  pi_pop = rbeta(n, alpha, beta )
+  
+  #Trim the pi_pops's because some may be extremely low, we will put on a cap at 0.1% allele frequency for these
+  #This means we will also need to trim the corresponding alpha's and beta's accordingly, within the right indexes
+  limit = 0.01
+  remove_index = which(pi_pop < limit)
+  
+  #Do this only is remove_index actually has elements
+  if (length(remove_index)>0) {
+    pi_pop <- pi_pop[pi_pop> limit]
+    
+    #Remove the pi_ref's that need to go 
+    pi_ref = pi_ref[-remove_index]
+  }
+  
+  #True SD's, without any noise, using the filter from above
+  Y = 1 / ( pi_pop * ( 1 - pi_pop ) )
+  
+  #Set noise  parameters and draw from the gamma pdf
+  #Set shape to 1, and scale to whatever is the Y
+  #Shape * Scale = mean, 1*scale = mean, 1*Y = Y
+  #Store required values to perform optimizations in this list
+  o_sd_input[[length(o_sd_input)+1]]     = list(rgamma( length(pi_pop), shape = 1 / var, scale = var) * Y)
+  pi_ref_input[[length(pi_ref_input)+1]] = list(pi_ref)
+}
+
+#Do the actual model testing
+model_pi_ref_1 = matrix(nrow = length(var_factor_adjusted), ncol = length(pi_ref_lower_bound)) #Store results
+for (i in seq(var_factor_adjusted)) { 
+  for (j in seq(pi_ref_lower_bound)) {
+    model_pi_ref_1[i,j] = optimise( f = LL_Gamma, o_sd = unlist( o_sd_input[[j]] ), pi_ref = unlist(pi_ref_input[[j]]), interval = c( 1e-4, 0.999 ), var = var_factor_adjusted[i]*var, maximum = TRUE  )$maximum
+  }
+}
+
+LL_pi_ref_1 = matrix(nrow = length(var_factor_adjusted), ncol = length(pi_ref_lower_bound)) #Store results
+for (i in seq(var_factor_adjusted)) { 
+  for (j in seq(pi_ref_lower_bound)) {
+    LL_pi_ref_1[i,j] = LL_Gamma( Fst = model_pi_ref_1[i,j], o_sd = unlist( o_sd_input[[j]] ), pi_ref = unlist(pi_ref_input[[j]]) , var = var_factor_adjusted[i]*var )
+  }
+}
+
+pi_ref_1 = model_pi_ref_1/0.05
+pi_ref_1 = rowMeans(pi_ref_1)
+LL_pi_ref_1 = rowMeans(LL_pi_ref_1)
+
+#Pi_Ref_lower_bound = 0.175->0.325
+
+#Keep Fst constant at 0.05
+#Start of by defining the constants that we are simulatig this data underneath
+#Number of replicates
+replicates = 100
+Fst = 0.05
+var = 0.035
+
+#Adjust the pi_ref range 
+pi_ref_lower_bound = rep(0.175,replicates)
+pi_ref_upper_bound = rep(0.325,replicates)
+
+# Initial empty lists to store results to do the proper optimization
+o_sd_input   = list()
+pi_ref_input = list()
+
+# Now the new experiments
+for(i in seq(pi_ref_lower_bound[1:length(pi_ref_lower_bound)])){
+  #Start of by defining the constants that we are simulatig this data underneath
+  n = 500 #Number of SNPs in the model
+  pi_ref = runif( n, pi_ref_lower_bound[i], pi_ref_upper_bound[i]) #Initial allele frequency
+  c = 1 / Fst - 1
+  alpha = c * ( pi_ref )
+  beta = ( 1 - pi_ref ) * c
+  pi_pop = rbeta(n, alpha, beta )
+  
+  #Trim the pi_pops's because some may be extremely low, we will put on a cap at 0.1% allele frequency for these
+  #This means we will also need to trim the corresponding alpha's and beta's accordingly, within the right indexes
+  limit = 0.01
+  remove_index = which(pi_pop < limit)
+  
+  #Do this only is remove_index actually has elements
+  if (length(remove_index)>0) {
+    pi_pop <- pi_pop[pi_pop> limit]
+    
+    #Remove the pi_ref's that need to go 
+    pi_ref = pi_ref[-remove_index]
+  }
+  
+  #True SD's, without any noise, using the filter from above
+  Y = 1 / ( pi_pop * ( 1 - pi_pop ) )
+  
+  #Set noise  parameters and draw from the gamma pdf
+  #Set shape to 1, and scale to whatever is the Y
+  #Shape * Scale = mean, 1*scale = mean, 1*Y = Y
+  #Store required values to perform optimizations in this list
+  o_sd_input[[length(o_sd_input)+1]]     = list(rgamma( length(pi_pop), shape = 1 / var, scale = var) * Y)
+  pi_ref_input[[length(pi_ref_input)+1]] = list(pi_ref)
+}
+
+#Do the actual model testing
+model_pi_ref_25 = matrix(nrow = length(var_factor_adjusted), ncol = length(pi_ref_lower_bound)) #Store results
+for (i in seq(var_factor_adjusted)) { 
+  for (j in seq(pi_ref_lower_bound)) {
+    model_pi_ref_25[i,j] = optimise( f = LL_Gamma, o_sd = unlist( o_sd_input[[j]] ), pi_ref = unlist(pi_ref_input[[j]]), interval = c( 1e-4, 0.999 ), var = var_factor_adjusted[i]*var, maximum = TRUE  )$maximum
+  }
+}
+
+LL_pi_ref_25 = matrix(nrow = length(var_factor_adjusted), ncol = length(pi_ref_lower_bound)) #Store results
+for (i in seq(var_factor_adjusted)) { 
+  for (j in seq(pi_ref_lower_bound)) {
+    LL_pi_ref_25[i,j] = LL_Gamma( Fst = model_pi_ref_25[i,j], o_sd = unlist( o_sd_input[[j]] ), pi_ref = unlist(pi_ref_input[[j]]) , var = var_factor_adjusted[i]*var )
+  }
+}
+
+pi_ref_25 = model_pi_ref_25/0.05
+pi_ref_25 = rowMeans(pi_ref_25)
+LL_pi_ref_25 = rowMeans(LL_pi_ref_25)
+
+#Pi_Ref_lower_bound = 0.25->0.25
+
+#Keep Fst constant at 0.05
+#Start of by defining the constants that we are simulatig this data underneath
+#Number of replicates
+replicates = 100
+Fst = 0.05
+var = 0.035
+
+#Adjust the pi_ref range 
+pi_ref_lower_bound = rep(0.25,replicates)
+pi_ref_upper_bound = rep(0.25,replicates)
+
+# Initial empty lists to store results to do the proper optimization
+o_sd_input   = list()
+pi_ref_input = list()
+
+# Now the new experiments
+for(i in seq(pi_ref_lower_bound[1:length(pi_ref_lower_bound)])){
+  #Start of by defining the constants that we are simulatig this data underneath
+  n = 500 #Number of SNPs in the model
+  pi_ref = runif( n, pi_ref_lower_bound[i], pi_ref_upper_bound[i]) #Initial allele frequency
+  c = 1 / Fst - 1
+  alpha = c * ( pi_ref )
+  beta = ( 1 - pi_ref ) * c
+  pi_pop = rbeta(n, alpha, beta )
+  
+  #Trim the pi_pops's because some may be extremely low, we will put on a cap at 0.1% allele frequency for these
+  #This means we will also need to trim the corresponding alpha's and beta's accordingly, within the right indexes
+  limit = 0.01
+  remove_index = which(pi_pop < limit)
+  
+  #Do this only is remove_index actually has elements
+  if (length(remove_index)>0) {
+    pi_pop <- pi_pop[pi_pop> limit]
+    
+    #Remove the pi_ref's that need to go 
+    pi_ref = pi_ref[-remove_index]
+  }
+  
+  #True SD's, without any noise, using the filter from above
+  Y = 1 / ( pi_pop * ( 1 - pi_pop ) )
+  
+  #Set noise  parameters and draw from the gamma pdf
+  #Set shape to 1, and scale to whatever is the Y
+  #Shape * Scale = mean, 1*scale = mean, 1*Y = Y
+  #Store required values to perform optimizations in this list
+  o_sd_input[[length(o_sd_input)+1]]     = list(rgamma( length(pi_pop), shape = 1 / var, scale = var) * Y)
+  pi_ref_input[[length(pi_ref_input)+1]] = list(pi_ref)
+}
+
+#Do the actual model testing
+model_pi_ref_4 = matrix(nrow = length(var_factor_adjusted), ncol = length(pi_ref_lower_bound)) #Store results
+for (i in seq(var_factor_adjusted)) { 
+  for (j in seq(pi_ref_lower_bound)) {
+    model_pi_ref_4[i,j] = optimise( f = LL_Gamma, o_sd = unlist( o_sd_input[[j]] ), pi_ref = unlist(pi_ref_input[[j]]), interval = c( 1e-4, 0.999 ), var = var_factor_adjusted[i]*var, maximum = TRUE  )$maximum
+  }
+}
+
+LL_pi_ref_4 = matrix(nrow = length(var_factor_adjusted), ncol = length(pi_ref_lower_bound)) #Store results
+for (i in seq(var_factor_adjusted)) { 
+  for (j in seq(pi_ref_lower_bound)) {
+    LL_pi_ref_4[i,j] = LL_Gamma( Fst = model_pi_ref_4[i,j], o_sd = unlist( o_sd_input[[j]] ), pi_ref = unlist(pi_ref_input[[j]]) , var = var_factor_adjusted[i]*var )
+  }
+}
+
+pi_ref_4 = model_pi_ref_4/0.05
+pi_ref_4 = rowMeans(pi_ref_4)
+LL_pi_ref_4 = rowMeans(LL_pi_ref_4)
+
+####Plot this shit
+Pi_Ref_Optim = plot_ly(data = x, x =~ x$`log(var_factor_adjusted)`, y = pi_ref_1, type = "scatter", name = '0.1-0.4', mode = 'lines+markers') %>%
+  add_trace(y = ~pi_ref_25, name = '0.175-0.325', type = "scatter",mode = 'lines+markers') %>%
+  add_trace(y = ~pi_ref_4, name = '0.25-0.25', type = "scatter",mode = 'lines+markers')
+
+Pi_Ref_LL = plot_ly(data = x, x =~ x$`log(var_factor_adjusted)`, y =~LL_pi_ref_1, type = "scatter", name = '0.1-0.4',mode = 'lines+markers') %>%
+  add_trace(y = ~LL_pi_ref_25, name = '0.175-0.325', type = "scatter",mode = 'lines+markers') %>%
+  add_trace(y = ~LL_pi_ref_4, name = '0.25-0.25', type = "scatter",mode = 'lines+markers')
+
+
+########## Looking at the likelihood function in more depth #####
+marginal_test = function(o_sd, z, alpha, beta, var) {log_result = log( 1 / ( ( z^-1*o_sd - 4 )^.5 * z^-1*o_sd ^ ( 3 / 2 ) ) ) +
+                                           log( ( dbeta( ( 0.5 - ( ( z^-1*o_sd - 4 ) ^ .5 ) / ( 2 * ( z^-1*o_sd ) ^ .5 ) ) , alpha, beta ) +  
+                                           dbeta( ( 0.5 + ( ( z^-1*o_sd - 4 ) ^ .5 ) / ( 2 * ( z^-1*o_sd ) ^ .5 ) ) , alpha, beta ) ) ) + 
+                                           dgamma( z, shape = 1 / var, scale = var, log = TRUE) +
+                                           log( z^-1 ) 
+                                           return(exp(log_result)/100)}
+
+
+#Take the Fst I have backed out from each of the replicates
+x1 = model_pi_ref_4[1,1]
+x2 = model_pi_ref_4[2,1]
+x3 = model_pi_ref_4[3,1]
+x4 = model_pi_ref_4[4,1]
+x5 = model_pi_ref_4[5,1]
+
+var1 = var*var_factor_adjusted[1]
+var2 = var*var_factor_adjusted[2]
+var3 = var*var_factor_adjusted[3]
+var4 = var*var_factor_adjusted[4]
+var5 = var*var_factor_adjusted[5]
+
+#Var_1
+#Define constants
+c_LL_1 = 1 / x1 - 1
+alpha_LL_1 = c_LL_1 * ( 0.25 )
+beta_LL_1 = ( 1 - 0.25 ) * c_LL_1
+
+#We want to integrate over each SD, in the range 1,100, 0.1
+
+LL_1 = NULL
+sigma = seq(0.01,20,0.01)
+for (i in seq(sigma)) {
+  LL_1[i] = integrate( marginal_test, lower = 0, upper = sigma[i]/4,
+                     o_sd = sigma[i] , alpha = alpha_LL_1, beta = beta_LL_1, var = var1)$value
+  
+}
+
+#Var_2
+#Define constants
+c_LL_2 = 1 / x2 - 1
+alpha_LL_2 = c_LL_2 * ( 0.25 )
+beta_LL_2 = ( 1 - 0.25 ) * c_LL_2
+
+#We want to integrate over each SD, in the range 1,100, 0.1
+
+LL_2 = NULL
+sigma = seq(0.01,20,0.01)
+for (i in seq(sigma)) {
+  LL_2[i] = integrate( marginal_test, lower = 0, upper = sigma[i]/4,
+                     o_sd = sigma[i] , alpha = alpha_LL_2, beta = beta_LL_2, var = var2)$value
+  
+}
+
+#Var_3
+#Define constants
+c_LL_3 = 1 / x3 - 1
+alpha_LL_3 = c_LL_3 * ( 0.25 )
+beta_LL_3 = ( 1 - 0.25 ) * c_LL_3
+
+#We want to integrate over each SD, in the range 1,100, 0.1
+
+LL_3 = NULL
+sigma = seq(0.01,20,0.01)
+for (i in seq(sigma)) {
+  LL_3[i] = integrate( marginal_test, lower = 0, upper = sigma[i]/4,
+                       o_sd = sigma[i] , alpha = alpha_LL_3, beta = beta_LL_3, var = var3)$value
+  
+}
+
+#Var_4
+#Define constants
+c_LL_4 = 1 / x4 - 1
+alpha_LL_4 = c_LL_4 * ( 0.25 )
+beta_LL_4 = ( 1 - 0.25 ) * c_LL_4
+
+#We want to integrate over each SD, in the range 1,100, 0.1
+
+LL_4 = NULL
+sigma = seq(0.01,20,0.01)
+for (i in seq(sigma)) {
+  LL_4[i] = integrate( marginal_test, lower = 0, upper = sigma[i]/4,
+                       o_sd = sigma[i] , alpha = alpha_LL_4, beta = beta_LL_4, var = var4)$value
+  
+}
+
+#Var_5
+#Define constants
+c_LL_5 = 1 / x5 - 1
+alpha_LL_5 = c_LL_5 * ( 0.25 )
+beta_LL_5 = ( 1 - 0.25 ) * c_LL_5
+
+#We want to integrate over each SD, in the range 1,100, 0.1
+
+LL_5 = NULL
+sigma = seq(0.01,20,0.01)
+for (i in seq(sigma)) {
+  LL_5[i] = integrate( marginal_test, lower = 0, upper = sigma[i]/4,
+                       o_sd = sigma[i] , alpha = alpha_LL_5, beta = beta_LL_5, var = var5)$value
+  
+}
+
+LL_All = rbind(LL_1, LL_2, LL_3, LL_4, LL_5)
+LL
+
+
+```
+
+```{r}
+library(plotly)
+library( data.table)
+library(pracma)
+
+############# Changes of Variables for the SD ################################
+
+#Describe the parameters that we are simulating our model underneath
+Fst = 0.001 #Drift; we are trying to learn this parameter
+pi_ref = 0.1 #Initial allele frequency
+c = 1 / Fst - 1
+alpha = c * ( pi_ref )
+beta = ( 1 - pi_ref ) * c
+pi_pop = seq(0.01,0.99,0.001) #Drifted allele frequency
+
+#We do not have access to pi_pop, but we have access to the SD, which is equivalent to:
+SD = ( 1 / ( ( pi_pop ) * ( 1 - pi_pop ) ) ) #This will be a value between 4 to infinity
+#Find the mean of these SD's
+#SD = mean(SD)
+
+#Change of variables 
+integrand = function(x) {1 / ( ( x - 4 )^.5 * x ^ ( 3 / 2 ) ) * ( dbeta( ( 0.5 - ( ( x - 4 ) ^ .5 ) / ( 2 * ( x ) ^ .5 ) ) , alpha, beta ) +  
+                                                                  dbeta( ( 0.5 + ( ( x - 4 ) ^ .5 ) / ( 2 * ( x ) ^ .5 ) ) , alpha, beta ) ) }
+#Check integral sums to one
+print(integrate( integrand, lower = 4, upper = Inf ) )
+
+#What does our likelihood look like?
+Likelihood = 1 / ( ( x - 4 )^.5 * x ^ ( 3 / 2 ) ) * ( dbeta( ( 0.5 - ( ( x - 4 ) ^ .5 ) / ( 2 * ( x ) ^ .5 ) ) , alpha, beta ) + 
+                                                      dbeta( ( 0.5 + ( ( x - 4 ) ^ .5 ) / ( 2 * ( x ) ^ .5 ) ) , alpha, beta ) )
+plot_ly(data = as.data.frame( Likelihood) , x =~ SD, y =~ Likelihood )
+
+##################################################### Show MLE Surfaces ################################
+
+res = NULL
+for( Fst in seq(0.001,0.1,0.005))
+{
+  c = 1 / Fst - 1
+  alpha = c * ( pi_ref )
+  beta = ( 1 - pi_ref ) * c
+  x = SD
+  Likelihood = 1 / ( ( x - 4 )^.5 * x ^ ( 3 / 2 ) ) * ( dbeta( ( 0.5 - ( ( x - 4 ) ^ .5 ) / ( 2 * ( x ) ^ .5 ) ) , alpha, beta ) +  dbeta( ( 0.5 + ( ( x - 4 ) ^ .5 ) / ( 2 * ( x ) ^ .5 ) ) , alpha, beta ) )
+  print(length(Likelihood))
+  Likelihood = Likelihood[!is.na(Likelihood) & !is.infinite(Likelihood)]
+  Likelihood = sum( log( Likelihood))
+
+  res = rbindlist( list( res, data.table( Fst = Fst, Likelihood = Likelihood)))
+}
+
+res[ , Normalized_Likelihood := exp( Likelihood - max( Likelihood) )]
+plot_ly( as.data.frame( res) , x =~ Fst, y =~(Likelihood ))
+
+######################################### Running the MLE Estimates ###################################
+
+n = 10000
+pi_ref = runif( n, 0.1, 0.5) #Initial allele frequency
+Fst = 0.1
+c = 1 / Fst - 1
+alpha = c * ( pi_ref )
+beta = ( 1 - pi_ref ) * c
+pi_pop_clean = rbeta( n , alpha , beta )
+o_sd = 1 / ( pi_pop_clean * ( 1 - pi_pop_clean ) )
+
+#Let's rewrite the code below in terms of a MLE that we can optimize with the R pacakger
+LL <- function( Fst , o_sd ) {
+      c = 1 / Fst - 1
+      alpha = c * ( pi_ref )
+      beta = ( 1 - pi_ref ) * c
+      Likelihood = 1 / ( ( o_sd - 4 )^.5 * o_sd ^ ( 3 / 2 ) ) * ( dbeta( ( 0.5 - ( ( o_sd - 4 ) ^ .5 ) / ( 2 * ( o_sd ) ^ .5 ) ) , alpha, beta ) + 
+                                                              dbeta( ( 0.5 + ( ( o_sd - 4 ) ^ .5 ) / ( 2 * ( o_sd ) ^ .5 ) ) , alpha, beta ) )
+      Log_Likelihood = sum( log( Likelihood))
+      return ( Log_Likelihood )
+}
+
+#Use optimize package from R
+MLE = optimise( f = LL, o_sd = o_sd, interval = c( 1e-4, 0.2 ), maximum = TRUE )
+print ( MLE$maximum )
+
+######################################### Adding outliers to the MLE###################################
+
+#Simulate the data we are running this model underneath
+n = 1000
+pi_ref = runif( n, 0.1, 0.5) #Initial allele frequency
+Fst = 0.02
+c = 1 / Fst - 1
+alpha = c * ( pi_ref )
+beta = ( 1 - pi_ref ) * c
+pi_pop = rbeta( n , alpha , beta )
+
+#Add some outliers to this dataset, in terms of the percentages
+n_outliers = 0.02
+#Get the index of which pi_pop's we will be replacing
+outliers_index = match( sample( pi_pop , n_outliers * length (pi_pop) ) , pi_pop )
+
+#Generate the clean SD's
+o_sd_clean = 1 / ( pi_pop * ( 1 - pi_pop ) )
+#Generate list of the values drawn from a uniform distribution that will be our approximate 'noise'
+outliers_values = 4 + rexp( n_outliers * length (pi_pop) , rate = 0.05) 
+#Generate the noisy SD's
+o_sd       = replace(x = o_sd_clean , values = outliers_values, list = outliers_index )
+
+#Add a mixture model to the LL that we had in the previous section, we will now need to optimize for two different parameters
+LL_Noise <- function( pars , o_sd ) {
+  #Hard code the level of noise in
+  c                = ( 1 / pars[ 1 ] ) - 1
+  alpha            = c * ( pi_ref )
+  beta             = ( 1 - pi_ref ) * c
+  Drift_Likelihood = 1 / ( ( o_sd - 4 )^.5 * o_sd ^ ( 3 / 2 ) ) * ( dbeta( ( 0.5 - ( ( o_sd - 4 ) ^ .5 ) / ( 2 * ( o_sd ) ^ .5 ) ) , alpha, beta ) + 
+                                                                dbeta( ( 0.5 + ( ( o_sd - 4 ) ^ .5 ) / ( 2 * ( o_sd ) ^ .5 ) ) , alpha, beta ) )
+  
+  Drift_Likelihood = Drift_Likelihood * ( 1 - pars[ 2 ])                                                                
+  Noise_Likelihood = pars[ 2 ] * dexp( o_sd - 4, rate = 0.05)
+  #Just for debugging purposes
+  #LL_Matrix = cbind( Drift_Likelihood, Noise_Likelihood )
+  LL               = sum ( log( Drift_Likelihood + Noise_Likelihood ) )
+  return ( - LL)
+}
+
+#Use Optimize function to estimate both the Fst level and the noise levels
+MLE_Noise = optim( par = c( 0.01 , 0.01 ) , fn = LL_Noise, o_sd = o_sd , lower = c( 1e-4,1e-4), upper = c( 0.2, 0.5), method = "L-BFGS-B")
+MLE_Noise$par
+
+######################################### Adding Gamma distributed Noise to the MLE Multiplicatively ###############################
+#Start of by defining the constants
+#Describe the parameters that we are simulating our model underneath
+#Beta binomial drift model
+Fst = 0.03 #Drift; we are trying to learn this parameter
+pi_ref = 0.25 #Initial allele frequency
+c = 1 / Fst - 1
+alpha = c * ( pi_ref )
+beta = ( 1 - pi_ref ) * c
+pi_pop = rbeta(1, alpha, beta )
+Y = 1 / ( pi_pop * ( 1 - pi_pop ) )
+
+#Set noise  parameters and draw from the gamma pdf
+#Set shape to 1, and scale to whatever is the Y
+#Shape * Scale = mean, 1*scale = mean, 1*Y = Y
+theta  = 1
+lambda = Y 
+Y_obs = rgamma( 1, shape = theta, scale = 1) *  Y
+
+#Joint PDF function
+Joint_PDF = function(Y,Z) {( 1 / ( ( Y - 4 )^.5 * (Y)^ ( 3 / 2 ) ) * ( dbeta( ( 0.5 - ( ( Y- 4 ) ^ .5 ) / ( 2 * ( Y ) ^ .5 ) ) , alpha, beta ) +  
+                                                                         dbeta( ( 0.5 + ( ( Y - 4 ) ^ .5 ) / ( 2 * ( Y ) ^ .5 ) ) , alpha, beta ) ) ) * dgamma( Z , theta, lambda ) }
+#Calculate the double integral
+Joint_PDF_Integral = integrate(function(Y) { 
+  sapply(Y, function(Y) {
+    integrate(function(Z) Joint_PDF(Y,Z), 0 , Inf)$value
+  })
+}, 4, Inf)
+#Check that this integral sums to one
+Joint_PDF_Integral$value
+
+#Set up integral, do the change of variables such that Y_obs = Y*Z
+marginal = function(z) {( 1 / ( ( z^-1*Y_obs - 4 )^.5 * z^-1*Y_obs ^ ( 3 / 2 ) ) * ( dbeta( ( 0.5 - ( ( z^-1*Y_obs - 4 ) ^ .5 ) / ( 2 * ( z^-1*Y_obs ) ^ .5 ) ) , alpha, beta ) +  
+                                                                    dbeta( ( 0.5 + ( ( z^-1*Y_obs - 4 ) ^ .5 ) / ( 2 * ( z^-1*Y_obs ) ^ .5 ) ) , alpha, beta ) ) ) *
+                                                                    dgamma( z, shape = theta, scale = lambda ) * z^-1}
+
+#Integrate out the noise term (z)
+factor = integrate( marginal, lower = 0, upper = Y_obs / 4 )$value
+factor
+
+####################################### Adding Gamma noise, across multiple data-points, VECTORIZED #######################
+#Start of by defining the constants
+#Describe the parameters that we are simulating our model underneath
+#Beta binomial drift model
+Fst = 0.5 #Drift; we are trying to learn this parameter
+#Number of SNPs in the model
+n = 1000
+pi_ref = runif( n, 0.1, 0.1) #Initial allele frequency
+c = 1 / Fst - 1
+alpha_v = c * ( pi_ref )
+beta_v = ( 1 - pi_ref ) * c
+pi_pop = rbeta(n, alpha, beta )
+Y = 1 / ( pi_pop * ( 1 - pi_pop ) )
+
+#Set noise  parameters and draw from the gamma pdf
+#Set shape to 1, and scale to whatever is the Y
+#Shape * Scale = mean, 1*scale = mean, 1*Y = Y
+lambda_v = Y 
+Y_obs_v = rgamma(n, shape = lambda_v, scale = 1)*Y
+
+#Set up integral, do the change of variables such that Y_obs = Y*Z
+marginal = function(z, Y_obs, alpha, beta, theta, lambda) {( 1 / ( ( z^-1*Y_obs - 4 )^.5 * z^-1*Y_obs ^ ( 3 / 2 ) ) * ( dbeta( ( 0.5 - ( ( z^-1*Y_obs - 4 ) ^ .5 ) / ( 2 * ( z^-1*Y_obs ) ^ .5 ) ) , alpha, beta ) +  
+                                                                                     dbeta( ( 0.5 + ( ( z^-1*Y_obs - 4 ) ^ .5 ) / ( 2 * ( z^-1*Y_obs ) ^ .5 ) ) , alpha, beta ) ) ) *
+                                                                                     dgamma( z, shape = theta, scale = 1 ) * z^-1}
+#Set integral upper bounds
+upper_v = Y_obs_v / 4
+
+#Calculate sum of the log likelihoods, test case below
+Log_Likelihood = NULL
+Likelihood = NULL
+for (i in 1:n) {
+  Likelihood[i] = integrate( marginal, lower = c(0), upper = upper_v[i], Y_obs = Y_obs_v[i], alpha = alpha_v[i], beta = beta_v[i], theta = theta_v[i], lambda = lambda_v[i])$value
+  Log_Likelihood = sum(log(Likelihood))
+}
+
+######Inferring the MLE FsT with some Gamma Noise (Across Multiple Data-Points) #####################
+
+#Start of by defining the constants that we are simulatig this data underneath
+Fst = 0.1
+n = 1000 #Number of SNPs in the model
+pi_ref = runif( n, 0.4, 0.4) #Initial allele frequency
+c = 1 / Fst - 1
+alpha = c * ( pi_ref )
+beta = ( 1 - pi_ref ) * c
+pi_pop = rbeta(n, alpha, beta )
+
+#True SD's, without any noise
+Y = 1 / ( pi_pop * ( 1 - pi_pop ) )
+
+#Set noise  parameters and draw from the gamma pdf
+#Set shape to 1, and scale to whatever is the Y
+#Shape * Scale = mean, 1*scale = mean, 1*Y = Y
+var = 0.01
+#Add in the mbar values
+mbar<-0.001;	#Equivalent to a sample of N=4000 and case proportion of 0.5, if we want to include 
+o_sd = rgamma( n, shape = 1 / var, scale = var) * Y 
+
+#Trim the O_SD's because some may be extremely high, we will put on a cap at 1000 for these
+#This means we will also need to trim the corresponding alpha's and beta's accordingly, within the right indexes
+#limit = 350
+#remove_index = which(o_sd > limit)
+#o_sd <- o_sd[o_sd< limit]
+
+#Remove the alpha's and beta's and pi_ref's that need to go 
+#pi_ref = pi_ref[-remove_index]
+#alpha  = alpha[-remove_index]
+#beta = beta[-remove_index]
+
+LL_Gamma = function( Fst, o_sd, pi_ref, var, mbar) {
+  #Number of datapoints, is length of o_sd
+  n = length(o_sd)
+  #Set variables
+  c = 1 / Fst - 1
+  alpha_v = c * ( pi_ref )
+  beta_v = ( 1 - pi_ref ) * c
+  
+  #Assume that we know the level of noise beforehand, and we don't want to infer it for now...
+  o_sd_v = o_sd 
+  #Set integral bounds
+  upper_v = o_sd_v / 4
+  
+  #Set up integral, do the change of variables such that Y_obs = Y*Z
+  # marginal = function(z, o_sd, alpha, beta) {log_result = log( 1 / ( ( z^-1*o_sd - 4 )^.5 * z^-1*o_sd ^ ( 3 / 2 ) ) ) +
+  #                                                         log( ( dbeta( ( 0.5 - ( ( z^-1*o_sd - 4 ) ^ .5 ) / ( 2 * ( z^-1*o_sd ) ^ .5 ) ) , alpha, beta ) +  
+  #                                                         dbeta( ( 0.5 + ( ( z^-1*o_sd - 4 ) ^ .5 ) / ( 2 * ( z^-1*o_sd ) ^ .5 ) ) , alpha, beta ) ) ) + 
+  #                                                         dgamma( z, shape = 1 / var, scale = var, log = TRUE) +
+  #                                                         log( z^-1 )
+  #                                              x = mpfr(log_result, precBits = 100)
+  #                                              return(exp(log_result)) }
+  
+  #Set up integral, do the change of variables such that Y_obs = Y*Z
+  marginal = function(z, o_sd, alpha, beta) {( 1 / ( ( z^-1*o_sd - 4 )^.5 * z^-1*o_sd ^ ( 3 / 2 ) ) * ( dbeta( ( 0.5 - ( ( z^-1*o_sd - 4 ) ^ .5 ) / ( 2 * ( z^-1*o_sd ) ^ .5 ) ) , alpha, beta ) +  
+                                                                                                        dbeta( ( 0.5 + ( ( z^-1*o_sd - 4 ) ^ .5 ) / ( 2 * ( z^-1*o_sd ) ^ .5 ) ) , alpha, beta ) ) ) *
+                                                                                                        dgamma( z, shape = 1 / var, scale = var) * z^-1}
+  
+  
+  Log_Likelihood = NULL
+  Likelihood = NULL
+  for (i in 1:n) {
+    Likelihood[i] = integrate( marginal, lower = c(0), upper = upper_v[i], o_sd = o_sd_v[i], alpha = alpha_v[i], beta = beta_v[i] )$value
+  }
+  Log_Likelihood = sum( log( Likelihood))
+  return (Log_Likelihood )
+}
+
+#Run the MLE function
+MLE = optimise( f = LL_Gamma, var = var, pi_ref = pi_ref, o_sd = o_sd, mbar = mbar, interval = c( 1e-4, 0.999 ), maximum = TRUE )
+MLE$maximum
+```
+
+```{r}
+#Jointly inferring levels of Fst & Noise
+library(plotly)
+#Likelihood function we will perform MLE over
+LL_Gamma = function(pars, o_sd, pi_ref, mbar) {
+  #Number of datapoints, is length of o_sd
+  n = length(o_sd)
+  #Set variables
+  c = 1 / pars[1] - 1
+  alpha_v = c * ( pi_ref )
+  beta_v = ( 1 - pi_ref ) * c
+  
+  #Assume that we know the level of noise beforehand, and we don't want to infer it for now...
+  o_sd_v = o_sd 
+  #Set integral bounds
+  upper_v = o_sd_v / (4*mbar)
+  
+  #Set up integral, do the change of variables such that Y_obs = Y*Z
+  marginal = function(z, o_sd, alpha, beta, mbar) {log_result = log( 1 / ( ( z^-1*o_sd*mbar^-1 - 4 )^.5 * z^-1*o_sd*mbar^-1 ^ ( 3 / 2 ) ) ) +
+    log( ( dbeta( ( 0.5 - ( ( z^-1*o_sd*mbar^-1 - 4 ) ^ .5 ) / ( 2 * ( z^-1*o_sd*mbar^-1 ) ^ .5 ) ) , alpha, beta ) +  
+             dbeta( ( 0.5 + ( ( z^-1*o_sd*mbar^-1 - 4 ) ^ .5 ) / ( 2 * ( z^-1*o_sd*mbar^-1 ) ^ .5 ) ) , alpha, beta ) ) ) + 
+    dgamma( z, shape = 1 / pars[2], scale = pars[2], log = TRUE) +
+    log( z^-1 )
+  
+  return(exp(log_result)) }
+  
+  Likelihood = NULL
+  
+  for (i in 1:n) {
+    Likelihood[i] = integrate( marginal, lower = c(0), upper = upper_v[i], o_sd = o_sd_v[i], alpha = alpha_v[i], beta = beta_v[i], mbar = mbar )$value
+  }
+  
+  Log_Likelihood = sum( log( Likelihood))
+  return (-Log_Likelihood )
+}
+
+#Simulate some data-points
+#Number of replicates
+set.seed(10)
+replicates = 1000
+Fst = rnorm( n = replicates, mean = 0.05, sd = 0.02)
+#Filter out the Fst below zero
+Fst = Fst[Fst>0]
+
+#Add noise into simulated data
+Noise = rnorm( n = replicates, mean = 0.035, sd = 0.005)
+
+# Initial empty lists to store results to do the proper optimization
+o_sd_input   = list()
+pi_ref_input = list()
+
+# Now the new experiments
+for(i in seq(Fst[1:length(Fst)])){
+  #Start of by defining the constants that we are simulatig this data underneath
+  n = 1000 #Number of SNPs in the model
+  pi_ref = runif( n, 0.1, 0.4) #Initial allele frequency
+  c = 1 / Fst[i] - 1
+  alpha = c * ( pi_ref )
+  beta = ( 1 - pi_ref ) * c
+  pi_pop = rbeta(n, alpha, beta )
+  mbar = 0.01
+  
+  #Trim the pi_pops's because some may be extremely low, we will put on a cap at 0.1% allele frequency for these
+  #This means we will also need to trim the corresponding alpha's and beta's accordingly, within the right indexes
+  limit = 0.01
+  remove_index = which(pi_pop < limit)
+  
+  #Do this only is remove_index actually has elements
+  if (length(remove_index)>0) {
+    pi_pop <- pi_pop[pi_pop> limit]
+    
+    #Remove the pi_ref's that need to go p
+    pi_ref = pi_ref[-remove_index]
+  }
+  
+  #True SD's, without any noise, using the filter from above
+  Y = ( 1 / ( pi_pop * ( 1 - pi_pop ) ) ) * mbar
+  
+  #Set noise  parameters and draw from the gamma pdf
+  #Set shape to 1, and scale to whatever is the Y
+  #Shape * Scale = mean, 1*scale = mean, 1*Y = Y
+  
+  var = Noise
+  
+  #Store required values to perform optimizations in this list
+  o_sd_input[[length(o_sd_input)+1]]     = list(rgamma( length(pi_pop), shape = 1 / var[i], scale = var[i]) * Y)
+  pi_ref_input[[length(pi_ref_input)+1]] = list(pi_ref)
+  
+}
+
+
+pars_infer = matrix(nrow = replicates, ncol = 2)
+
+
+#Loop over all the simulations
+for (i in seq(1,100)) {
+  print(i)
+  pars_infer[i,] = optim( par = c( 0.05 , 0.01 ) , fn = LL_Gamma, o_sd = unlist(o_sd_input[[i]][1]), pi_ref = unlist(pi_ref_input[[i]]), mbar = 0.01, lower = c( 1e-4,1e-2), upper = c( 0.99, 0.05), method = "L-BFGS-B")$par
+}
+
+Fst_Inferred = pars_infer[1:996,1]
+Noise_Inferred = pars_infer[,2]
+
+#Plot the final graphs with plotly
+Fst_Simulated = Fst
+Noise_Simulated = Noise
+
+Fst_Graph = as.data.frame(cbind(Fst_Inferred,Fst_Simulated))
+Noise_Graph = as.data.frame(cbind(Noise_Inferred, Noise_Simulated))
+plot_ly(data = Fst_Graph, x=~ Fst_Graph$Fst_Inferred, y=~Fst_Graph$Fst_Simulated, type = "scatter")
+plot_ly(data = Noise_Graph, x=~ Noise_Graph$Noise_Inferred, y=~Noise_Graph$Noise_Simulated, type = "scatter")
+
+```
+
