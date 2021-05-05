@@ -1,0 +1,68 @@
+---
+title: "gwas_sumstats_sims"
+output: html_document
+---
+```{r}
+library(plotly)
+library(data.table)
+```
+
+This will be all the code for section 4.1 and maybe? 4.2 of the thesis which looks at the effect of AF to SEs in a GWAS setting
+
+```{r}
+#Look at distribution of SE values from logistic model
+n.gwas<-1e3;
+n.sim<-1000;
+phi<-0.3;
+y<-rbinom(n.gwas, 1, phi);
+
+op<-array(0, c(n.sim, 3));
+colnames(op)<-c("FQ", "beta", "se.beta");
+for (i in 1:n.sim) {
+  fq<-runif(1,0.02, 0.98);
+  x<-rbinom(n.gwas, 2, fq);
+  y<-sample(y);
+  lg<-summary(glm(y~x, family="binomial"));
+  op[i,]<-c(mean(x)/2, lg$coef[2,1:2]);
+}
+e.se<-sqrt(1/(n.gwas*phi*(1-phi))*1/(2*op[,1]*(1-op[,1])));
+
+fig <- plot_ly(data = iris, y = ~e.se, x = ~op[,3])
+fig <- fig %>% layout(title = "Relationship between Implied and True GWAS Variances",yaxis = list(title =  TeX("\\text{Implied Variance}  \\ \\hat \\sigma^2")), xaxis = list(title = TeX("\\text{Observerd Variance} \\  \\sigma^2"))) %>% config(mathjax = "cdn")
+
+fig
+
+```
+Look at the relationship within real UK-Biobank data
+```{r}
+bolt_hypertension_all_snps_sumstats = fread("./imputed_test_chr1", header = T)
+#filter to genotyped and imputed data
+genotyped_index = which(bolt_hypertension_all_snps_sumstats$INFO ==1)
+implied_se  =  1/(2*bolt_hypertension_all_snps_sumstats$A1FREQ*(1-bolt_hypertension_all_snps_sumstats$A1FREQ)*360381*0.2102*(1-0.2102))^0.5
+true_se     =  bolt_hypertension_all_snps_sumstats$SE/0.17 #Convert to quanitative scale
+fig <- plot_ly(data = iris, x = ~true_se[-genotyped_index][1:5000], y = ~implied_se[-genotyped_index][1:5000],mode = 'markers',type = 'scatter', name = 'Imputed')
+fig <- fig %>% add_trace(x = ~true_se[genotyped_index][1:5000], y = ~implied_se[genotyped_index][1:5000],mode = 'markers',type = 'scatter', name = 'Genotyped')
+fig <- fig %>% layout(title = "Relationship between Implied and True GWAS Variances in UK-Biobank Data",yaxis = list(title =  TeX("\\text{Implied Variance}  \\ \\hat \\sigma^2")), xaxis = list(title = TeX("\\text{Observerd Variance} \\  \\sigma^2"))) %>% config(mathjax = "cdn")
+fig <- fig %>% add_trace(x =~seq(0,0.03,0.01),y = ~seq(0,0.03,0.01), name = 'trace 0',mode = 'lines')
+fig
+```
+
+Plot the correlation to missigness
+```{r}
+bolt_hypertension_all_snps_sumstats = fread("./imputed_test_chr1", header = T)
+#filter to genotyped and imputed data
+genotyped_index = which(bolt_hypertension_all_snps_sumstats$INFO ==1)
+implied_se  =  1/(2*bolt_hypertension_all_snps_sumstats$A1FREQ*(1-bolt_hypertension_all_snps_sumstats$A1FREQ)*360381*0.2102*(1-0.2102))^0.5
+true_se     =  bolt_hypertension_all_snps_sumstats$SE/0.17 #Convert to quanitative scale
+fig <- plot_ly(data = iris, y = ~abs(true_se[-genotyped_index][1:5000]-implied_se[-genotyped_index][1:5000]), x = ~bolt_hypertension_all_snps_sumstats$INFO[-genotyped_index][1:5000],mode = 'markers',type = 'scatter', name = 'Imputed')
+fig <- fig %>% layout(title = "Relationship between Imputed INFO-Score and Accuracy of Implied Variances",xaxis = list(title = "INFO-Score"), yaxis = list(title = "abs(Observerd Variance -Implied Variance)"))
+
+fig
+
+```
+
+
+
+
+
+
