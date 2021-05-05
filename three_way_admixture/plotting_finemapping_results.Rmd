@@ -1,0 +1,259 @@
+---
+title: "admixture_results"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+For the plots what we want is a violin plot across the different possible options for the choice of reference panel:
+```{r FDR Plots}
+library(plotly)
+
+#Create dataframe
+#Read in the results data
+nregions = 185
+AFR_panel      = as.numeric(unlist(readRDS("results/pooled_AFR_ld_true_sumstats_region_fdr.RData")))
+AFR            = rep("AFR",nregions)
+x1 = cbind.data.frame(AFR,as.numeric(AFR_panel))
+colnames(x1) = c("panel", "fdr")
+EUR_panel      = unlist(readRDS("results/pooled_EUR_ld_true_sumstats_region_fdr.RData"))
+EUR            = rep("EUR",nregions)
+x2 = cbind.data.frame(EUR,as.numeric(EUR_panel))
+colnames(x2) = c("panel", "fdr")
+EAS_panel      = unlist(readRDS("results/pooled_EAS_ld_true_sumstats_region_fdr.RData"))
+EAS            = rep("EAS",nregions)
+x3 = cbind.data.frame(EAS,as.numeric(EAS_panel))
+colnames(x3) = c("panel", "fdr")
+in_sample_LD   = unlist(readRDS("results/pooled_in_sample_ld_true_sumstats_region_fdr.RData"))
+GWAS            = rep("GWAS",nregions)
+x4 = cbind.data.frame(GWAS,as.numeric(in_sample_LD))
+colnames(x4) = c("panel", "fdr")
+ref_admixed_LD = unlist(readRDS("results/pooled_ref_admixed_ld_true_sumstats_region_fdr.RData"))
+Ref_Admixed            = rep("Ref Admixed",nregions)
+x5 = cbind.data.frame(Ref_Admixed,as.numeric(ref_admixed_LD))
+colnames(x5) = c("panel", "fdr")
+KG_LD_panel = unlist(readRDS("results/pooled_1000G_proportions_ld_true_sumstats_region_fdr.RData"))
+KG_LD            = rep("1000G Proportions",nregions)
+x6 = cbind.data.frame(KG_LD,as.numeric(KG_LD_panel))
+colnames(x6) = c("panel", "fdr")
+Inferred_LD_panel = unlist(readRDS("results/pooled_1000G_weighted_ld_true_sumstats_region_fdr.RData"))
+Inferred_LD       = rep("Inferred LD",nregions)
+x7 = cbind.data.frame(Inferred_LD,as.numeric(Inferred_LD_panel))
+colnames(x7) = c("panel", "fdr")
+
+#Bind results together in a dataframe
+results = rbind.data.frame(x1,x2,x3,x4,x5,x6,x7)
+fig <- results %>%
+  plot_ly(
+    x = ~panel,        #Split by reference panel
+    y = ~fdr, #FDR values
+    split = ~panel,    #The different traces
+    type = 'violin',
+    box = list(
+      visible = T
+    ),
+    meanline = list(
+      visible = T
+    )
+  ) 
+
+fig <- fig %>%
+  layout(
+    xaxis = list(
+      title = "Day"
+    ),
+    yaxis = list(
+      title = "Total Bill",
+      zeroline = F
+    )
+  )
+
+fig
+```
+Now do the same but with the indicator functions (bar plot)
+
+```{r Indicator}
+##Adding errors bars (to be binomially distributed)
+# plus/minus se = sqrt(pq), where n is number of regions, sqrt(nRegions*0.5)
+#Create dataframe
+#Read in the results data
+library(tidyverse)
+nregions = 185
+AFR_panel      = as.numeric(unlist(readRDS("results/pooled_AFR_ld_true_sumstats_region_indicator.RData")))
+AFR            = rep("AFR",nregions)
+x1 = cbind.data.frame(AFR,as.numeric(AFR_panel))
+colnames(x1) = c("panel", "indicator")
+EUR_panel      = unlist(readRDS("results/pooled_EUR_ld_true_sumstats_region_indicator.RData"))
+EUR            = rep("EUR",nregions)
+x2 = cbind.data.frame(EUR,as.numeric(EUR_panel))
+colnames(x2) = c("panel", "indicator")
+EAS_panel      = unlist(readRDS("results/pooled_EAS_ld_true_sumstats_region_indicator.RData"))
+EAS            = rep("EAS",nregions)
+x3 = cbind.data.frame(EAS,as.numeric(EAS_panel))
+colnames(x3) = c("panel", "indicator")
+in_sample_LD   = unlist(readRDS("results/pooled_in_sample_ld_true_sumstats_region_indicator.RData"))
+GWAS            = rep("GWAS",nregions)
+x4 = cbind.data.frame(GWAS,as.numeric(in_sample_LD))
+colnames(x4) = c("panel", "indicator")
+ref_admixed_LD = unlist(readRDS("results/pooled_ref_admixed_ld_true_sumstats_region_indicator.RData"))
+Ref_Admixed            = rep("Ref Admixed",nregions)
+x5 = cbind.data.frame(Ref_Admixed,as.numeric(ref_admixed_LD))
+colnames(x5) = c("panel", "indicator")
+KG_LD = unlist(readRDS("results/pooled_1000G_proportions_ld_true_sumstats_region_indicator.RData"))
+KG_LD_panel            = rep("1000G",nregions)
+x6 = cbind.data.frame(KG_LD_panel,as.numeric(KG_LD))
+colnames(x6) = c("panel", "indicator")
+Inferred_LD_panel = unlist(readRDS("results/pooled_1000G_weighted_ld_true_sumstats_region_indicator.RData"))
+Inferred_LD       = rep("Inferred LD",nregions)
+x7 = cbind.data.frame(Inferred_LD,as.numeric(Inferred_LD_panel))
+colnames(x7) = c("panel", "indicator")
+results = rbind.data.frame(x1,x2,x3,x4,x5,x6,x7)
+
+#Now we need to count up the values as we did in Chpt 2:
+y = results %>% group_by(panel,.drop = FALSE) %>% count(indicator)
+y = as.data.frame(y)
+
+#For each panel we need to make sure we include all 4 possiblities (0,1,2,3 causal marginal SNPs included)
+for (i in 1:length(unique(as.character(y$panel)))) {
+  #Find which values we are missing
+  marginal = c(0,1,2,3)
+  missed_marginal = (marginal[which(! marginal %in% y[y$panel == unique(as.character(y$panel))[i],]$indicator)])
+  #Add a fake dummy indicator for these values
+  if (length(missed_marginal) > 0 ) {
+    for (j in 1:length(missed_marginal)) {
+    print(c(unique(as.character(y$panel))[i]))
+    print(j)
+    print(missed_marginal)
+    print(missed_marginal[j],0)
+      y = rbind(y,c(unique(as.character(y$panel))[i],missed_marginal[j],0))
+    }
+  }
+}
+
+y = y[order(y$panel,y$indicator),]
+
+
+#Reshape based on the value?
+fig <- plot_ly(y , x = ~unique(y$panel), y = ~y[y$indicator == 3,]$n, type = 'bar', name = '3')
+fig <- fig %>% add_trace(y , x = ~unique(y$panel), y = ~y[y$indicator == 2,]$n, type = 'bar', name = '2')
+fig <- fig %>% add_trace(y , x = ~unique(y$panel), y = ~y[y$indicator == 1,]$n, type = 'bar', name = '1')
+fig <- fig %>% add_trace(y , x = ~unique(y$panel), y = ~y[y$indicator == 0,]$n, type = 'bar', name = '0')
+fig <- fig %>% layout(yaxis = list(title = 'Count',type = 'linear'), barmode = 'group')
+
+#fig <- fig %>% add_trace(x = ~as.character(unique(y$panel)),y = ~as.numeric(y[y$indicator == 0,]$n, name = '0'))
+#fig <- fig %>% layout(yaxis = list(title = 'Number of Regions', barmode = 'group',autotick = F, dtick = 10),
+#                      xaxis = list(title = "Panel",categoryorder = "array"),
+#                      title = "Proportion of Regions with True Causal Variant within Credible Set")
+fig
+
+y
+```
+```{r}
+
+wt_results = readRDS("weight_inference_results/weights_region_20")
+inferred_ld = readRDS("weight_inference_results/LD_inferred_region_20")
+inferred_ld = matrix(inferred_ld,nrow = length(inferred_ld)^0.5)
+l = nrow(inferred_ld)
+ii<-1:l
+im<-array(ii,c(l,l))
+#del<-exp(-abs(im - t(im))*0.001)
+gwas_haps_cases = t(fread("hapgen2/gwas_region_20.cases.haps"))
+gwas_haps_controls = t(fread("hapgen2/gwas_region_20.controls.haps"))
+gwas_ld = LD_Matrix(rbind(gwas_haps_controls,gwas_haps_cases))
+index = sample(seq(1:length(c(gwas_ld))),size = 5000)
+fig <- plot_ly(data = iris, x = ~c(del*inferred_ld)[index], y = ~c(gwas_ld)[index])
+fig
+KG_LD = fread("finemap/1000G_proportions_ld_region_20.ld")
+summary(lm(c(del*inferred_ld)~c(unlist(gwas_ld))))$r.squared
+summary(lm(c(unlist(KG_LD))~c(unlist(gwas_ld))))$r.squared
+
+```
+```{r}
+#Assessing calibration of SNPs (normally)
+#Readin a finemap .snp file:
+#Loop through all the regions:
+nregions  = 10
+tp        = matrix(data = NA, nrow = 10, ncol = nregions) #Store the proprtion of TPs in each bin for each simulation
+mean_pips = matrix(data = NA, nrow = 10, ncol = nregions) #Store the proprtion of TPs in each bin for each simulation
+for (i in 1:nregions) {
+  print(i)
+  #Read in posterior file and bin it
+  snp_finemap = fread(sprintf("finemap/in_sample_ld_true_sumstats_region_%s.snp",i), header = T)
+  breaks      =  c(0,.10,.20,.30,.40,.50,.6,.7,.8,.9,1)
+  breaks_labels = breaks[2:length(breaks)]
+  snp_finemap$bins = cut(snp_finemap$prob,breaks=breaks,labels = breaks[2:length(breaks)])
+  #Read in causal variant file
+  snp_causal = unlist(fread(sprintf("hapgen2/snps_gwas_causal_region_%s",i), header = F))
+  #For each bin ask how many causal variants were in it
+  for (j in 1:length(breaks_labels)) {
+    cut_bins_posterior = snp_finemap[snp_finemap$bins == breaks_labels[j],]
+    tp[j,i]   = (length(which(cut_bins_posterior$position %in% snp_causal)))/nrow(cut_bins_posterior)
+    mean_pips[j,i] = mean(cut_bins_posterior$prob)
+  }
+}
+
+plot(rowMeans(tp,na.rm = T),rowMeans(mean_pips,na.rm = T))
+abline(0,1)
+```
+
+```{r}
+#Assessing calibration of SNPs Distributions
+#Loop through all the regions:
+nregions    = 185
+nSamples    = 100 #Number of samples we draw from the LD distribution
+tp          = array(data = NA, dim = c(nSamples,nregions,10))  #Store the proprtion of TPs in each bin for each simulation (yaxis)
+mean_pips   = array(data = NA, dim = c(nSamples,nregions,10)) #Store the mean PIPs per bin (xaxis)
+for (i in 1:nregions) {   #Loop through regions
+  print(i)
+  for (j in 1:nSamples) { #Loop through the LD samples drawn from the posterior
+      #Read in posterior file and bin it
+      snp_finemap      = fread(sprintf("finemap_distributions/inferred_ld_true_sumstats_region_%s_sample_%s.snp",i,j), header = T)
+      breaks           =  c(0,.10,.20,.30,.40,.50,.6,.7,.8,.9,1)
+      breaks_labels    = breaks[2:length(breaks)]
+      snp_finemap$bins = cut(snp_finemap$prob,breaks=breaks,labels = breaks_labels)
+      #Read in causal variant file
+      snp_causal = unlist(fread(sprintf("hapgen2/snps_gwas_causal_region_%s",i), header = F))
+      #For each bin ask how many causal variants were in it
+      for (k in 1:length(breaks_labels)) {
+          cut_bins_posterior = snp_finemap[snp_finemap$bins == breaks_labels[k],]
+          tp[j,i,k]   = (length(which(cut_bins_posterior$position %in% snp_causal)))/nrow(cut_bins_posterior)
+          mean_pips[j,i,k] = mean(cut_bins_posterior$prob)
+      }
+   }
+}
+  
+#Get the average of this data and then plot it:
+x_pip = apply(mean_pips, c(2,3), mean, na.rm = TRUE)
+y_pip = apply(tp,        c(2,3), mean,  na.rm = TRUE)
+averaged_x_pip = colMeans(x_pip, na.rm = T)
+averaged_y_pip = colMeans(y_pip, na.rm = T)
+
+tp_2        = matrix(data = NA, nrow = 10, ncol = nregions) #Store the proprtion of TPs in each bin for each simulation
+mean_pips_2 = matrix(data = NA, nrow = 10, ncol = nregions) #Store the proprtion of TPs in each bin for each simulation
+for (i in 1:nregions) {
+  print(i)
+  #Read in posterior file and bin it
+  snp_finemap = fread(sprintf("finemap/EUR_ld_true_sumstats_region_%s.snp",i), header = T)
+  breaks      =  c(0,.10,.20,.30,.40,.50,.6,.7,.8,.9,1)
+  breaks_labels = breaks[2:length(breaks)]
+  snp_finemap$bins = cut(snp_finemap$prob,breaks=breaks,labels = breaks[2:length(breaks)])
+  #Read in causal variant file
+  snp_causal = unlist(fread(sprintf("hapgen2/snps_gwas_causal_region_%s",i), header = F))
+  #For each bin ask how many causal variants were in it
+  for (j in 1:length(breaks_labels)) {
+    cut_bins_posterior = snp_finemap[snp_finemap$bins == breaks_labels[j],]
+    tp_2[j,i]   = (length(which(cut_bins_posterior$position %in% snp_causal)))/nrow(cut_bins_posterior)
+    mean_pips_2[j,i] = mean(cut_bins_posterior$prob)
+  }
+}
+
+averaged_x_pip_ref = rowMeans(tp_2,na.rm = T)
+averaged_y_pip_ref = rowMeans(mean_pips_2,na.rm = T)
+fig_1 <- plot_ly(data = iris, x = ~averaged_x_pip, y = ~averaged_y_pip, name = "Distributional LD", mode = 'markers')
+fig_2 <- plot_ly(data = iris,x = ~averaged_x_pip_ref , y = ~averaged_y_pip_ref, name = 'Reference Admixed LD',mode = 'markers')
+fig_1
+fig_2
+```
+
