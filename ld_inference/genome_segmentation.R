@@ -34,46 +34,6 @@ genome_segmentation = function(window_size  = 2e6,   #How big is the actual wind
   #Find problematic regions
   problematic_region = which(nsnps_per_region < min_SNPs)
   
-  # #Do loop until no problematic regions are left
-  # while (length(problematic_region) > 0){
-  #   #Take each problematic region and split the SNPs into the region that is closest based on BP
-  #   #Do this by appending the section of rows of the sumstats to the previous/subsequent sumstats
-  #   #Then we delete that region
-  #   
-  #   #Loop through all problematic regions
-  #   for (i in 1:length(problematic_region)) {
-  #     
-  #     #Indexes of the SNPs that will move
-  #     SNP_index_move_left  = c()
-  #     SNP_index_move_right = c()
-  #     
-  #     #Few edge cases to consider:
-  #     if (problematic_region[i] == 1) { #This means we need to merge the first region
-  #       #Merge first region with second region
-  #       
-  #     }
-  #     
-  #     if (problematic_region[i] == 1) { #This means we need to merge the first region
-  #       #Merge last region with second-last region
-  #       
-  #     }
-  #     
-  #     if (nrow(regions_list[[problematic_region[i]]]) == 1) { #This means there is only a single SNP to consider, usually means duplicated windows
-  #       #Ask if the next region has also this same SNP
-  #       if (nrow(regions_list[[problematic_region[i]]]) {
-  #         
-  #       }
-  #       regions_list[[problematic_region[i]]]
-  #     }
-  #     
-  #     
-  #     #The 'easy' SNPs are those that are on the overhang over the flanking regions
-  #     SNP_index_move_left  = c(SNP_index_move_left,which(max(regions_list[[problematic_region[i]-1]]$BP)-regions_list[[problematic_region[i]]]$BP > 0)))
-  #     SNP_index_move_right  = c(SNP_index_move_right,which(min(regions_list[[problematic_region[i]+1]]$BP)-regions_list[[problematic_region[i]]]$BP > 0)))
-  #     myList[[5]] <- NULL
-  #     
-  #   }
-  
   #Remove the problematic regions
   for (i in 1:length(problematic_region)) {
     regions_list[[problematic_region[i]]] <- NULL
@@ -81,19 +41,16 @@ genome_segmentation = function(window_size  = 2e6,   #How big is the actual wind
   
   #Write out these regions 
   for (i in 1:length(regions_list)) {
+    #Write out the reference panel that corresponds with this as well
+    #Loop through each of the regions to get the start and end position (note that the sumstats and reference panel will already be matched at this point in)
+    #So hopefully no bugs will occur
     saveRDS(regions_list[[i]],sprintf("data/segemented_regions/%s_sumstats_region_%s", pop_panel, i))
-  }
-  
-  #Write out the reference panel that corresponds with this as well
-  #Loop through each of the regions to get the start and end position (note that the sumstats and reference panel will already be matched at this point in)
-  #So hopefully no bugs will occur
-  for (i in 1:length(regions_list)) {
     #Load in reference panel
     full_ref_panel    = readRDS(sprintf("data/reference_panel_%s",pop_panel))
     #Extract the SNP indexes, note that this means the rsids will be stored as the column names
     full_rsid         = colnames(full_ref_panel)
     #Find the rsids in each region
-    indexes_kept      = which(regions_list[[i]]$SNP %in% full_rsid)
+    indexes_kept      = which(full_rsid %in%  regions_list[[i]]$SNP)
     #Extract these SNPs from the reference panel
     subset_ref_panel  = full_ref_panel[,indexes_kept]
     #Save the panel

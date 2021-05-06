@@ -1,0 +1,198 @@
+---
+title: "ukbb_analysis_graphs"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+source("InferLD/R/HMM_Functions.R")
+source("InferLD/R/validation_pipeline_functions.R")
+source("/well/mcvean/mtutert/thesis_code/thesis_code/ld_inference/InferLD/R/Weights_LD_Inference.R")
+```
+
+This code will run the final graphs for the uk-biobank analysis used in chapter 5.2
+
+```{r Pooling AF UKBB Data}
+#Get the nregions
+nregions    = 5
+#Get the populations
+populations = c("EUR","AFR","EUR_AFR")
+#Get the Fst levels
+fst         = c(0.1,0.01,0.001)
+#Store the allele frequencies (inferred) in a list of length 9 (3x3)
+inferred_af = list()
+refence_af  = list()
+gwas_af_full= list()
+#Loop through the 3 populations
+counter = 0
+for (i in 1:length(populations)) {
+  for (j in 1:length(fst)) { #Loop through the fst
+     counter = counter + 1
+     print(counter)
+     inferred_pooled_results = c()
+     ref_pooled_results      = c()
+     gwas_af_pooled_results  = c()
+  #Pool the data across the regions
+    for (k in 1:nregions) {   #Loop through the regions
+       #Read in the allele frequency data
+        print(sprintf("results/inference_%s_panel_region_%s_fst_%s",populations[i],k,fst[j]))
+        results         = readRDS(sprintf("results/inference_%s_panel_region_%s_fst_%s",populations[i],k,fst[j]))
+        sumstats        = readRDS(sprintf("data/segemented_regions/%s_sumstats_region_%s",populations[i],k))
+        reference_haps  = readRDS(sprintf("data/segemented_regions/%s_ref_hap_panel_region_%s",populations[i],k))
+        gwas_af         = sumstats$A1FREQ
+        #Calculate reference AFs on these SNPs
+        ref_af          = colMeans(reference_haps)
+        #Get my allele frequencies averaged out over the last 90% of the samples
+        updates         = ncol(results$inferred_af_given_weights)
+        #Append the results to my vector at this position in the list
+        region_inferred_af      = c(rowMeans(results$inferred_af_given_weights[,(.9*updates):updates]))
+        inferred_pooled_results = c(inferred_pooled_results,region_inferred_af)
+        ref_pooled_results      = c(ref_pooled_results,ref_af)
+        gwas_af_pooled_results  = c(gwas_af_pooled_results,gwas_af)
+        }
+     inferred_af[[counter]]  = inferred_pooled_results
+     refence_af[[counter]]   = ref_pooled_results
+     gwas_af_full[[counter]] = gwas_af_pooled_results
+  }
+}
+```
+
+
+With this pooled data, plot the results of the Allele frequencies across Fst levels and across population panels
+```{r}
+#9 graphs to plot here which we will pool together
+EUR_fst_0.1 <- plot_ly(data =iris, x = ~gwas_af_full[[1]])
+EUR_fst_0.1 <- EUR_fst_0.1 %>% add_trace(y = ~refence_af[[1]], name = 'Reference',mode = 'markers')
+EUR_fst_0.1 <- EUR_fst_0.1 %>% add_trace(y = ~inferred_af[[1]], name = 'Inferred', mode = 'markers')
+EUR_fst_0.1
+
+
+AFR_fst_0.1 <- plot_ly(data =iris, x = ~gwas_af_full[[4]])
+AFR_fst_0.1 <- AFR_fst_0.1 %>% add_trace(y = ~refence_af[[4]], name = 'Reference',mode = 'markers')
+AFR_fst_0.1 <- AFR_fst_0.1 %>% add_trace(y = ~inferred_af[[4]], name = 'Inferred', mode = 'markers')
+AFR_fst_0.1
+
+AFR_fst_0.1 <- plot_ly(data =iris, x = ~gwas_af_full[[7]])
+AFR_fst_0.1 <- AFR_fst_0.1 %>% add_trace(y = ~refence_af[[7]], name = 'Reference',mode = 'markers')
+AFR_fst_0.1 <- AFR_fst_0.1 %>% add_trace(y = ~inferred_af[[7]], name = 'Inferred', mode = 'markers')
+AFR_fst_0.1
+
+#FINISH PLOTTING THESE GRAPHS AFTER LUNCH
+
+```
+
+
+```{r Extract the GWAS LD}
+# #Calculate the true GWAS LD across each region using PLINK
+# nregions = 220
+# for (i in 1:nregions) {
+#   #Extract the GWAS IDs from the summary stats file 
+#   sumstats        = readRDS(sprintf("data/segemented_regions/EUR_sumstats_region_%s",i))
+#   write.table(sumstats$SNP,sprintf("data/rsid_across_regions/region_%s_rsid",i), quote = F, row.names = F, col.names = F)
+#   #Calculate the GWAS LD and save it to the data folder
+#   system(sprintf("/apps/well/plink/1.90b3/plink --bfile /well/mcvean/ukbb12788/mtutert/genotyped_qc_wba/ukbb_genotype_qc_wba_chr1 --extract data/rsid_across_regions/region_%s_rsid --keep-allele-order --r square --out data/ld_across_regions/ld_region_%s",i,i))
+# }
+```
+
+
+```{r Pool together the LD}
+#Get the nregions
+nregions    = 5
+#Get the populations
+populations = c("EUR","AFR","EUR_AFR")
+#Get the Fst levels
+fst         = c(0.1,0.01,0.001)
+#Store the allele frequencies (inferred) in a list of length 9 (3x3)
+inferred_ld = list()
+refence_ld  = list()
+gwas_ld_full= list()
+#Loop through the 3 populations
+counter = 0
+for (i in 1:length(populations)) {
+  for (j in 1:length(fst)) { #Loop through the fst
+     counter = counter + 1
+     inferred_pooled_results = c()
+     ref_pooled_results      = c()
+     gwas_ld_pooled_results  = c()
+  #Pool the data across the regions
+    for (k in 1:nregions) {   #Loop through the regions
+       #Read in the allele frequency data
+        results         = readRDS(sprintf("results/inference_%s_panel_region_%s_fst_%s",populations[i],k,fst[j]))
+        sumstats        = readRDS(sprintf("data/segemented_regions/%s_sumstats_region_%s",populations[i],k))
+        reference_haps  = readRDS(sprintf("data/segemented_regions/%s_ref_hap_panel_region_%s",populations[i],k))
+        
+        #Read in the reference LD as a vector
+        ref_ld                  = c(LD_Matrix(reference_haps))
+        ref_pooled_results      = c(ref_pooled_results,ref_ld)
+        #Read in the GWAS LD
+        gwas_ld                 = c(as.matrix(fread(sprintf("data/ld_across_regions/ld_region_%s.ld",k))))
+        gwas_ld_pooled_results  = c(gwas_ld_pooled_results,gwas_ld)
+        #Calculate the inferred LD
+        #Get my allele frequencies averaged out over the last 90% of the samples
+        updates         = ncol(results$inferred_af_given_weights)
+        #Get the average of the weights across this region
+        avg_posterior_weights      = c(rowMeans(results$Gibbs_Array[,(.9*updates):updates]))
+        #Calculate the LD accordingky
+        inferred_ld_region  = c(cov.wt(x = reference_haps,wt = avg_posterior_weights,cor = T)$cor)
+        inferred_pooled_results = c(inferred_pooled_results,inferred_ld_region)
+      }
+     print(counter)
+     inferred_ld[[counter]]  = inferred_pooled_results
+     refence_ld[[counter]]   = ref_pooled_results
+     gwas_ld_full[[counter]] = gwas_ld_pooled_results
+  }
+}
+```
+
+Plot the LD but SUBSAMPLE
+
+```{r Plot the LD}
+colors = brewer.pal(length(2),name = "Dark2")
+nindexes = length(gwas_ld_full[[1]])
+indexes = sample(x = seq(1:nindexes),size = 5000)
+
+EUR_fst_0.1_ld <- plot_ly(data =iris, x = ~gwas_ld_full[[1]][indexes])
+EUR_fst_0.1_ld <- EUR_fst_0.1_ld %>% add_trace(y = ~refence_ld[[1]][indexes], name = 'Reference',mode = 'markers', marker = list(opacity = 0.9),opacity = 0.7)
+EUR_fst_0.1_ld <- EUR_fst_0.1_ld %>% add_trace(y = ~inferred_ld[[1]][indexes], name = 'Inferred', mode = 'markers',marker = list(opacity = 0.9),opacity = 0.7)
+
+EUR_fst_0.01_ld <- plot_ly(data =iris, x = ~gwas_ld_full[[2]][indexes])
+EUR_fst_0.01_ld <- EUR_fst_0.01_ld %>% add_trace(y = ~refence_ld[[2]][indexes], name = 'Reference',mode = 'markers', marker = list(opacity = 0.9),opacity = 0.7)
+EUR_fst_0.01_ld <- EUR_fst_0.01_ld %>% add_trace(y = ~inferred_ld[[2]][indexes], name = 'Inferred', mode = 'markers',marker = list(opacity = 0.9),opacity = 0.7)
+
+EUR_fst_0.001_ld <- plot_ly(data =iris, x = ~gwas_ld_full[[3]][indexes])
+EUR_fst_0.001_ld <- EUR_fst_0.001_ld %>% add_trace(y = ~refence_ld[[3]][indexes], name = 'Reference',mode = 'markers', marker = list(opacity = 0.9),opacity = 0.7)
+EUR_fst_0.001_ld <- EUR_fst_0.001_ld %>% add_trace(y = ~inferred_ld[[3]][indexes], name = 'Inferred', mode = 'markers',marker = list(opacity = 0.9),opacity = 0.7)
+
+
+AFR_fst_0.1_ld <- plot_ly(data =iris, x = ~gwas_ld_full[[4]][indexes])
+AFR_fst_0.1_ld <- AFR_fst_0.1_ld %>% add_trace(y = ~refence_ld[[4]][indexes], name = 'Reference',mode = 'markers', marker = list(opacity = 0.9),opacity = 0.7, colors = colors[1])
+AFR_fst_0.1_ld <- AFR_fst_0.1_ld %>% add_trace(y = ~inferred_ld[[4]][indexes], name = 'Inferred', mode = 'markers',marker = list(opacity = 0.9),opacity = 0.7, colors = colors[2])
+
+AFR_fst_0.01_ld <- plot_ly(data =iris, x = ~gwas_ld_full[[5]][indexes])
+AFR_fst_0.01_ld <- AFR_fst_0.01_ld %>% add_trace(y = ~refence_ld[[5]][indexes], name = 'Reference',mode = 'markers', marker = list(opacity = 0.9),opacity = 0.7, colors = colors[1])
+AFR_fst_0.01_ld <- AFR_fst_0.01_ld %>% add_trace(y = ~inferred_ld[[5]][indexes], name = 'Inferred', mode = 'markers',marker = list(opacity = 0.9),opacity = 0.7, colors = colors[2])
+
+AFR_fst_0.001_ld <- plot_ly(data =iris, x = ~gwas_ld_full[[6]][indexes])
+AFR_fst_0.001_ld <- AFR_fst_0.001_ld %>% add_trace(y = ~refence_ld[[6]][indexes], name = 'Reference',mode = 'markers', marker = list(opacity = 0.9),opacity = 0.7, colors = colors[1])
+AFR_fst_0.001_ld <- AFR_fst_0.001_ld %>% add_trace(y = ~inferred_ld[[6]][indexes], name = 'Inferred', mode = 'markers',marker = list(opacity = 0.9),opacity = 0.7, colors = colors[2])
+
+EUR_AFR_fst_0.1_ld <- plot_ly(data =iris, x = ~gwas_ld_full[[7]][indexes])
+EUR_AFR_fst_0.1_ld <- EUR_AFR_fst_0.1_ld %>% add_trace(y = ~refence_ld[[7]][indexes], name = 'Reference',mode = 'markers', marker = list(opacity = 0.9),opacity = 0.7, colors = colors[1])
+EUR_AFR_fst_0.1_ld <- EUR_AFR_fst_0.1_ld %>% add_trace(y = ~inferred_ld[[7]][indexes], name = 'Inferred', mode = 'markers',marker = list(opacity = 0.9),opacity = 0.7, colors = colors[2])
+
+EUR_AFR_fst_0.01_ld <- plot_ly(data =iris, x = ~gwas_ld_full[[7]][indexes])
+EUR_AFR_fst_0.01_ld <- EUR_AFR_fst_0.01_ld %>% add_trace(y = ~refence_ld[[7]][indexes], name = 'Reference',mode = 'markers', marker = list(opacity = 0.9),opacity = 0.7, colors = colors[1])
+EUR_AFR_fst_0.01_ld <- EUR_AFR_fst_0.01_ld %>% add_trace(y = ~inferred_ld[[7]][indexes], name = 'Inferred', mode = 'markers',marker = list(opacity = 0.9),opacity = 0.7, colors = colors[2])
+
+EUR_AFR_fst_0.001_ld <- plot_ly(data =iris, x = ~gwas_ld_full[[7]][indexes])
+EUR_AFR_fst_0.001_ld <- EUR_AFR_fst_0.001_ld %>% add_trace(y = ~refence_ld[[7]][indexes], name = 'Reference',mode = 'markers', marker = list(opacity = 0.9),opacity = 0.7, colors = colors[1])
+EUR_AFR_fst_0.001_ld <- EUR_AFR_fst_0.001_ld %>% add_trace(y = ~inferred_ld[[7]][indexes], name = 'Inferred', mode = 'markers',marker = list(opacity = 0.9),opacity = 0.7, colors = colors[2])
+
+
+fig <- subplot(EUR_fst_0.1_ld, AFR_fst_0.1_ld,EUR_AFR_fst_0.1_ld,
+               EUR_fst_0.01_ld, AFR_fst_0.01_ld,EUR_AFR_fst_0.01_ld,
+               EUR_fst_0.001_ld, AFR_fst_0.001_ld,EUR_AFR_fst_0.001_ld,
+               nrows = 3)
+fig
+```
+

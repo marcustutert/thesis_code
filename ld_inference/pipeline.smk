@@ -9,14 +9,13 @@ Note that we may need to add specific things to the profile as we go on the fly-
 """
 
 import itertools as itertools
-chains        = [1,2,3,4,5]             #Number of chains in the gibbs sampling (Will take the maximum)
 populations   = ["EUR","AFR","EUR_AFR"] #Populations used in the reference panel
-regions       = list(range(1,5))                     #This will be hard-coded in for now, and correspond to the result of the genome_segmentations
-
+regions       = list(range(1,221))                     #This will be hard-coded in for now, and correspond to the result of the genome_segmentations
+fst           = [0.1,0.01,0.001]
 rule all:
     input:
         #expand("pop_split_msprime/target_1_replicate_{replicates}_dt_{divergence_time}.csv", replicates = replicates, divergence_time = divergence_time)
-        expand("results/inference_{populations}_panel_region_{regions}_chain_{chains}", populations = populations, chains = chains, regions = regions)
+        expand("results/inference_{populations}_panel_region_{regions}_fst_{fst}", populations = populations, regions = regions, fst = fst)
 
 
 #This only needs to be done for the different populations (or combinations thereof) (so no need to do over params)
@@ -34,13 +33,12 @@ rule all:
 #Run the Gibbs Sampling
 rule run_gibbs:
     output:
-        "results/inference_{populations}_panel_region_{regions}_chain_{chains}"
+        "results/inference_{populations}_panel_region_{regions}_fst_{fst}"
     conda:
         "/well/mcvean/mtutert/snakemake/envs/r.yaml"
     params:
-        chains                       = "{chains}",
         populations                  = "{populations}",
-        regions                      = "{regions}"
+        regions                      = "{regions}",
+        fst                          = "{fst}"
     script:
         "ld_inference_across_populations_parameters.R"
-

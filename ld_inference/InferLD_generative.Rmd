@@ -87,17 +87,107 @@ generative_model = function(fst,
   #Convert to noisy GWAS
   kappa = 4*(gwas_af*(1-gwas_af))
   gwas_sigma_2_noisy = gwas_sigma_2_true*rgamma(length(gwas_sigma_2_true),shape = noise*kappa ,rate = noise*kappa) #This is what gets read into InferLD
-  return(list(gwas_sigma_2_noisy,gwas_af,W_true_star[,1]))
+  return(list(gwas_sigma_2_noisy,gwas_af,W_true_star))
 }
 ```
 
 
-```{r}
-generative_model_results = generative_model(fst = 0.1,noise = 1e4,nstates = 100)
+```{r High Fst, Low Noise}
+set.seed(34)
+generative_model_results = generative_model(fst = 0.1,noise = 1e5,nstates = 100)
 #Run the inference
 results                             = LD_from_GSHMM(ref_allele_matrix     = reference_haplotype_panel,
-                                                    fst                   = 0.05,
-                                                    alpha                 = 1e4,
+                                                    fst                   = 0.1,
+                                                    alpha                 = 1e5,
+                                                    nSamples              = 2,
+                                                    weights_resolution    = 100,
+                                                    likelihood_toggle     = TRUE,
+                                                    gwas_variance         = generative_model_results[[1]],
+                                                    LD_Infer              = FALSE,
+                                                    recombination         = FALSE,
+                                                    case_control_constant = mbar/2,
+                                                    BurnIn                = 0.9,
+                                                    debug                 = TRUE)
+#Get the figures
+log_likelihood_across_samples(inference_weights = results)
+af_r2_across_samples(inference_weights = results,gwas_af = generative_model_results[[2]])
+ld_r2_across_samples(inference_weights = results,W_true_star = generative_model_results[[3]],reference_haplotype_panel = reference_haplotype_panel)
+```
+
+```{r High Fst High Noise}
+set.seed(5)
+generative_model_results = generative_model(fst = 0.1,noise = 1e3,nstates = 100)
+#Run the inference
+results                             = LD_from_GSHMM(ref_allele_matrix     = reference_haplotype_panel,
+                                                    fst                   = 0.1,
+                                                    alpha                 = 1e3,
+                                                    nSamples              = 2,
+                                                    weights_resolution    = 100,
+                                                    likelihood_toggle     = TRUE,
+                                                    gwas_variance         = generative_model_results[[1]],
+                                                    LD_Infer              = FALSE,
+                                                    recombination         = FALSE,
+                                                    case_control_constant = mbar/2,
+                                                    BurnIn                = 0.9,
+                                                    debug                 = TRUE)
+#Get the figures
+log_likelihood_across_samples(inference_weights = results)
+af_r2_across_samples(inference_weights = results,gwas_af = generative_model_results[[2]])
+ld_r2_across_samples(inference_weights = results,W_true_star = generative_model_results[[3]],reference_haplotype_panel = reference_haplotype_panel)
+```
+
+```{r Low Fst Low Noise}
+set.seed(34)
+generative_model_results = generative_model(fst = 0.005,noise = 1e5,nstates = 100)
+#Run the inference
+results                             = LD_from_GSHMM(ref_allele_matrix     = reference_haplotype_panel,
+                                                    fst                   = 0.005,
+                                                    alpha                 = 1e5,
+                                                    nSamples              = 2,
+                                                    weights_resolution    = 100,
+                                                    likelihood_toggle     = TRUE,
+                                                    gwas_variance         = generative_model_results[[1]],
+                                                    LD_Infer              = FALSE,
+                                                    recombination         = FALSE,
+                                                    case_control_constant = mbar/2,
+                                                    BurnIn                = 0.9,
+                                                    debug                 = TRUE)
+#Get the figures
+log_likelihood_across_samples(inference_weights = results)
+af_r2_across_samples(inference_weights = results,gwas_af = generative_model_results[[2]])
+ld_r2_across_samples(inference_weights = results,W_true_star = generative_model_results[[3]],reference_haplotype_panel = reference_haplotype_panel)
+```
+```{r Low Fst High Noise}
+set.seed(34)
+generative_model_results = generative_model(fst = 0.005,noise = 1e2,nstates = 100)
+#Run the inference
+results                             = LD_from_GSHMM(ref_allele_matrix     = reference_haplotype_panel,
+                                                    fst                   = 0.005,
+                                                    alpha                 = 1e2,
+                                                    nSamples              = 2,
+                                                    weights_resolution    = 100,
+                                                    likelihood_toggle     = TRUE,
+                                                    gwas_variance         = generative_model_results[[1]],
+                                                    LD_Infer              = FALSE,
+                                                    recombination         = FALSE,
+                                                    case_control_constant = mbar/2,
+                                                    BurnIn                = 0.9,
+                                                    debug                 = TRUE)
+#Get the figures
+log_likelihood_across_samples(inference_weights = results)
+af_r2_across_samples(inference_weights = results,gwas_af = generative_model_results[[2]])
+ld_r2_across_samples(inference_weights = results,W_true_star = generative_model_results[[3]],reference_haplotype_panel = reference_haplotype_panel)
+```
+
+Now we can move onto mis-specifying the values of Fst, given the correct levels of noise and see what happens...
+
+```{r High True Fst, Estimated Low Fst}
+set.seed(34)
+generative_model_results = generative_model(fst = 0.1,noise = 1e5,nstates = 100)
+#Run the inference
+results                             = LD_from_GSHMM(ref_allele_matrix     = reference_haplotype_panel,
+                                                    fst                   = 0.001,
+                                                    alpha                 = 1e5,
                                                     nSamples              = 2,
                                                     weights_resolution    = 100,
                                                     likelihood_toggle     = TRUE,
