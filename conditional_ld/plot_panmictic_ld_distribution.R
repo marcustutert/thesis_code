@@ -39,13 +39,13 @@ fig %>% layout(annotations = list(
   list(x = 1.0 , y = 1.0, text = "rho = 1e-9", showarrow = F, xref='paper', yref='paper')))
 
 #####Plot the conditional distributions (each point in the graph above)
-values = c(44,53,62)
+values = c(25,20,50)
 rep_1 = list.files(path = "msprime", pattern = sprintf("peripheral_\\d+_replicate_%s_dt_0_recomb_1e-8.csv",values[[1]]), full.names = T)
 rep_2 = list.files(path = "msprime", pattern = sprintf("peripheral_\\d+_replicate_%s_dt_0_recomb_1e-8.csv",values[[2]]), full.names = T)
 rep_3 = list.files(path = "msprime", pattern = sprintf("peripheral_\\d+_replicate_%s_dt_0_recomb_1e-8.csv",values[[3]]), full.names = T)
 
 ld                       = lapply(rep_1,fread,header = T)
-peripheral_array          = array(unlist(ld),dim = c(nhaps_target,2,peripheral_pop)) 
+peripheral_array          = array(unlist(ld),dim = c(1000,2,peripheral_pop)) 
 ld_peripheral             = apply(peripheral_array, c(3), cov.wt,method = "ML", cor = TRUE)
 ld_cor_peripheral_matrix  = lapply(ld_peripheral, `[[`, 4)
 ld_peripheral_values      = c()

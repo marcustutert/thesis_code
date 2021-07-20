@@ -11,7 +11,7 @@ Note that we may need to add specific things to the profile as we go on the fly-
 import itertools as itertools
 print("Executing snakefile")
 #Run the simulation across different number of reference panel regions
-regions             = list(range(1,185)) #
+regions             = list(range(1,999)) #
 rule all:
     input:
         #expand("hapgen2/pop_ADMIX_region_{regions}.map", regions = regions)

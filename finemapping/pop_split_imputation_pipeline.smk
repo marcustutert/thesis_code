@@ -20,7 +20,7 @@ print("Executing snakefile")
 replicates             = list(range(1,1000))         #Ask Rao how to not have this be hard-coded in
 divergence_time        = ["0","10","50","125"]
 model                  = "pop_split"              #Change this between OOA model and pop_split
-signal                 = "FALSE"                   #True means causal variants, False is under the null model
+signal                 = "TRUE"                   #True means causal variants, False is under the null model
 
 rule all:
     input:
@@ -32,8 +32,8 @@ rule all:
         #expand("pop_split/sumstat_imputation/results/pooled_rare_variants_{signal}_gwas_LD_dt_{divergence_time}", signal = signal, divergence_time = divergence_time)
         #expand("pop_split/finemap/ref_ld_imputed_sumstats_by_gwas_ld_region_{replicates}_dt_{divergence_time}_{signal}.log_sss", replicates = replicates, divergence_time = divergence_time, signal = signal),
         #expand("pop_split/finemap/gwas_ld_imputed_sumstats_by_gwas_ld_region_{replicates}_dt_{divergence_time}_cred_set_{signal}_indicator.RData", replicates = replicates, divergence_time = divergence_time, signal = signal),
-        expand("pop_split/sumstat_imputation/results/pooled_rare_variants_{signal}_gwas_LD_dt_{divergence_time}", signal = signal, divergence_time = divergence_time)
-        #expand("pop_split/results/pooled_gwas_ld_imputed_sumstats_by_ref_ld_region_fdr_dt_{divergence_time}.RData", divergence_time = divergence_time)
+        #expand("pop_split/sumstat_imputation/results/pooled_rare_variants_{signal}_gwas_LD_dt_{divergence_time}", signal = signal, divergence_time = divergence_time)
+        expand("pop_split/results/pooled_gwas_ld_imputed_sumstats_by_ref_ld_region_fdr_dt_{divergence_time}.RData", divergence_time = divergence_time)
 #Generate msprime simulations (GWAS panel and the associated references)
 rule msprime_sims:
     output:

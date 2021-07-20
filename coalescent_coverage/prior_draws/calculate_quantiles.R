@@ -19,7 +19,7 @@ LD_Array             = do.call('abind', lapply(LD_file_list, readRDS))
 
 #Get the quantiles
 nquantiles           = 100
-LD_quantile_matrx    = apply(LD_Array, 1:2, quantile, prob = c(seq(0,1,length = nquantiles)))
+LD_quantile_matrx    = apply(LD_Array, 1:2, quantile, prob = c(seq(0,1,length = nquantiles)), na.rm = TRUE)
 
 #Read in the actual GWAS matrix and calculate the LD
 GWAS    = as.matrix(fread(sprintf("msprime_data/population_split/matched_panels/GWAS_panel_replicate_%s_split_%s.csv", replicate, divergence_time), header = T))
@@ -30,7 +30,7 @@ nsnps   = ncol(GWAS_LD)
 
 #Loop through rows and columns in M to find which index of the array matches up closest with element M[i,j]
 LD_results = matrix(data = NA, nrow = nsnps, ncol = nsnps)
-for (i in 1:nsnps) {
+for (i in (1:nsnps)) {
   print(i)
   for (j in i:nsnps) {
     true_value         = GWAS_LD[i,j]
@@ -43,10 +43,15 @@ for (i in 1:nsnps) {
 # #Get the AF quantiles across all nsnps
 AF_results           = c()
 
-for (i in 1:nsnps) {
+for (i in (1:nsnps)) {
   #Get the quantiled data
   data      = AF_list[i,]
-  quantiles = split(data, cut(data, quantile(data, prob = 0:nquantiles / nquantiles, names = FALSE), include = TRUE))
+  if (length(unique(data)) == 1) {
+    print("here")
+    AF_results = NA
+  }
+  else{
+  quantiles = split(data, cut(data, quantile(data, prob = 0:nquantiles / nquantiles, names = FALSE, na.rm = TRUE), include = TRUE))
   intervals = names(quantiles)
   #Grep out the second element of each name to get the overlapping sets
   boundaries = c()
@@ -55,7 +60,13 @@ for (i in 1:nsnps) {
   }
   #Now look for where in the data does our true value lie
   pi_pop                 = GWAS_AF[i]
-  AF_results[i]          = which.min(abs(boundaries - pi_pop))
+  if (length(which.min(abs(boundaries - pi_pop))) == 0) {
+    AF_results[i]        = NA
+  }
+  else{
+    AF_results[i] = which.min(abs(boundaries - pi_pop))
+  }
+  }
 }
 saveRDS(LD_results,sprintf("results/pop_split/%s_split_LD_quantile_counts_replicate_%s.RData", divergence_time_fst_parameter, replicate), version = 2)
 saveRDS(AF_results,sprintf("results/pop_split/%s_split_AF_quantile_counts_replicate_%s.RData", divergence_time_fst_parameter, replicate), version = 2)

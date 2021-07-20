@@ -13,7 +13,7 @@ library(plotly)
 
 #Create dataframe
 #Read in the results data
-nregions = 185
+nregions = 19
 AFR_panel      = as.numeric(unlist(readRDS("results/pooled_AFR_ld_true_sumstats_region_fdr.RData")))
 AFR            = rep("AFR",nregions)
 x1 = cbind.data.frame(AFR,as.numeric(AFR_panel))
@@ -39,12 +39,14 @@ KG_LD            = rep("1000G Proportions",nregions)
 x6 = cbind.data.frame(KG_LD,as.numeric(KG_LD_panel))
 colnames(x6) = c("panel", "fdr")
 Inferred_LD_panel = unlist(readRDS("results/pooled_1000G_weighted_ld_true_sumstats_region_fdr.RData"))
-Inferred_LD       = rep("Inferred LD",nregions)
+Inferred_LD       = rep("Infer LD",nregions)
 x7 = cbind.data.frame(Inferred_LD,as.numeric(Inferred_LD_panel))
 colnames(x7) = c("panel", "fdr")
 
 #Bind results together in a dataframe
 results = rbind.data.frame(x1,x2,x3,x4,x5,x6,x7)
+
+results
 fig <- results %>%
   plot_ly(
     x = ~panel,        #Split by reference panel
@@ -61,11 +63,12 @@ fig <- results %>%
 
 fig <- fig %>%
   layout(
+    title = "Admixture Finemapping Posterior Probability Accuracy across LD Panels",
     xaxis = list(
-      title = "Day"
+      title = "LD Panel"
     ),
     yaxis = list(
-      title = "Total Bill",
+      title = "Weighted Posterior of Causal Variant in 95% Credible Set ",
       zeroline = F
     )
   )
@@ -80,7 +83,7 @@ Now do the same but with the indicator functions (bar plot)
 #Create dataframe
 #Read in the results data
 library(tidyverse)
-nregions = 185
+nregions = 19
 AFR_panel      = as.numeric(unlist(readRDS("results/pooled_AFR_ld_true_sumstats_region_indicator.RData")))
 AFR            = rep("AFR",nregions)
 x1 = cbind.data.frame(AFR,as.numeric(AFR_panel))
@@ -106,7 +109,7 @@ KG_LD_panel            = rep("1000G",nregions)
 x6 = cbind.data.frame(KG_LD_panel,as.numeric(KG_LD))
 colnames(x6) = c("panel", "indicator")
 Inferred_LD_panel = unlist(readRDS("results/pooled_1000G_weighted_ld_true_sumstats_region_indicator.RData"))
-Inferred_LD       = rep("Inferred LD",nregions)
+Inferred_LD       = rep("Infer LD",nregions)
 x7 = cbind.data.frame(Inferred_LD,as.numeric(Inferred_LD_panel))
 colnames(x7) = c("panel", "indicator")
 results = rbind.data.frame(x1,x2,x3,x4,x5,x6,x7)
@@ -140,7 +143,7 @@ fig <- plot_ly(y , x = ~unique(y$panel), y = ~y[y$indicator == 3,]$n, type = 'ba
 fig <- fig %>% add_trace(y , x = ~unique(y$panel), y = ~y[y$indicator == 2,]$n, type = 'bar', name = '2')
 fig <- fig %>% add_trace(y , x = ~unique(y$panel), y = ~y[y$indicator == 1,]$n, type = 'bar', name = '1')
 fig <- fig %>% add_trace(y , x = ~unique(y$panel), y = ~y[y$indicator == 0,]$n, type = 'bar', name = '0')
-fig <- fig %>% layout(yaxis = list(title = 'Count',type = 'linear'), barmode = 'group')
+fig <- fig %>% layout(yaxis = list(title = "Number of Regions",type = 'linear'), barmode = 'group', title = "Number of Causal Variants Assigned in 95% Credible Set Across Panels", xaxis = list(title = "Panel"))
 
 #fig <- fig %>% add_trace(x = ~as.character(unique(y$panel)),y = ~as.numeric(y[y$indicator == 0,]$n, name = '0'))
 #fig <- fig %>% layout(yaxis = list(title = 'Number of Regions', barmode = 'group',autotick = F, dtick = 10),
@@ -170,6 +173,7 @@ summary(lm(c(del*inferred_ld)~c(unlist(gwas_ld))))$r.squared
 summary(lm(c(unlist(KG_LD))~c(unlist(gwas_ld))))$r.squared
 
 ```
+
 ```{r}
 #Assessing calibration of SNPs (normally)
 #Readin a finemap .snp file:
@@ -200,16 +204,35 @@ abline(0,1)
 
 ```{r}
 #Assessing calibration of SNPs Distributions
-#Loop through all the regions:
-nregions    = 185
-nSamples    = 100 #Number of samples we draw from the LD distribution
-tp          = array(data = NA, dim = c(nSamples,nregions,10))  #Store the proprtion of TPs in each bin for each simulation (yaxis)
-mean_pips   = array(data = NA, dim = c(nSamples,nregions,10)) #Store the mean PIPs per bin (xaxis)
+nregions            = 19  #Number of regions
+nSamples            = 100 #Number of samples we draw from the LD distribution
+
+#True proportions of false positive across regions and bins
+tp_GWAS_LD          = array(data = NA, dim = c(nSamples,nregions,10)) 
+tp_EAS_LD           = array(data = NA, dim = c(nSamples,nregions,10))  
+tp_EUR_LD           = array(data = NA, dim = c(nSamples,nregions,10))
+tp_AFR_LD           = array(data = NA, dim = c(nSamples,nregions,10)) 
+tp_1000G_LD         = array(data = NA, dim = c(nSamples,nregions,10)) 
+tp_Ref_Admixed_LD   = array(data = NA, dim = c(nSamples,nregions,10))  
+tp_Infer_LD         = array(data = NA, dim = c(nSamples,nregions,10))  
+tp_Infer_Distr_LD   = array(data = NA, dim = c(nSamples,nregions,10))  
+
+#Mean PIPs in each bin
+mean_pip_GWAS_LD        = array(data = NA, dim = c(nSamples,nregions,10)) 
+mean_pip_EAS_LD         = array(data = NA, dim = c(nSamples,nregions,10))
+mean_pip_EUR_LD         = array(data = NA, dim = c(nSamples,nregions,10)) 
+mean_pip_AFR_LD         = array(data = NA, dim = c(nSamples,nregions,10)) 
+mean_pip_1000G_LD       = array(data = NA, dim = c(nSamples,nregions,10))
+mean_pip_Ref_Admixed_LD = array(data = NA, dim = c(nSamples,nregions,10)) 
+mean_Infer_LD           = array(data = NA, dim = c(nSamples,nregions,10)) 
+mean_Infer_Distr_LD     = array(data = NA, dim = c(nSamples,nregions,10)) 
+
+
+#Generate all the NON Distribrution Panels
 for (i in 1:nregions) {   #Loop through regions
-  print(i)
-  for (j in 1:nSamples) { #Loop through the LD samples drawn from the posterior
+      print(i)
       #Read in posterior file and bin it
-      snp_finemap      = fread(sprintf("finemap_distributions/inferred_ld_true_sumstats_region_%s_sample_%s.snp",i,j), header = T)
+      snp_finemap      = fread(sprintf("finemap/EUR_ld_true_sumstats_region_%s.snp",i), header = T)
       breaks           =  c(0,.10,.20,.30,.40,.50,.6,.7,.8,.9,1)
       breaks_labels    = breaks[2:length(breaks)]
       snp_finemap$bins = cut(snp_finemap$prob,breaks=breaks,labels = breaks_labels)
@@ -217,13 +240,16 @@ for (i in 1:nregions) {   #Loop through regions
       snp_causal = unlist(fread(sprintf("hapgen2/snps_gwas_causal_region_%s",i), header = F))
       #For each bin ask how many causal variants were in it
       for (k in 1:length(breaks_labels)) {
-          cut_bins_posterior = snp_finemap[snp_finemap$bins == breaks_labels[k],]
-          tp[j,i,k]   = (length(which(cut_bins_posterior$position %in% snp_causal)))/nrow(cut_bins_posterior)
-          mean_pips[j,i,k] = mean(cut_bins_posterior$prob)
-      }
+          cut_bins_posterior     = snp_finemap[snp_finemap$bins == breaks_labels[k],]
+          tp_EUR_LD[j,i,k]       = (length(which(cut_bins_posterior$position %in% snp_causal)))/nrow(cut_bins_posterior)
+          mean_pip_EUR_LD[j,i,k] = mean(cut_bins_posterior$prob)
    }
 }
-  
+
+averaged_mean_pip_EUR_LD = rowMeans(mean_pip_EUR_LD,na.rm = T)
+tp_GWAS_LD               = rowMeans(tp_EUR_LD,na.rm = T)
+
+
 #Get the average of this data and then plot it:
 x_pip = apply(mean_pips, c(2,3), mean, na.rm = TRUE)
 y_pip = apply(tp,        c(2,3), mean,  na.rm = TRUE)
@@ -249,8 +275,6 @@ for (i in 1:nregions) {
   }
 }
 
-averaged_x_pip_ref = rowMeans(tp_2,na.rm = T)
-averaged_y_pip_ref = rowMeans(mean_pips_2,na.rm = T)
 fig_1 <- plot_ly(data = iris, x = ~averaged_x_pip, y = ~averaged_y_pip, name = "Distributional LD", mode = 'markers')
 fig_2 <- plot_ly(data = iris,x = ~averaged_x_pip_ref , y = ~averaged_y_pip_ref, name = 'Reference Admixed LD',mode = 'markers')
 fig_1

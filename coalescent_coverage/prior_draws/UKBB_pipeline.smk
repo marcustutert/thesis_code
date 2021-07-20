@@ -12,7 +12,7 @@ Note that we may need to add specific things to the profile as we go on the fly-
 ###########################
 
 import itertools as itertools
-regions = list(range(1,2)) #Regions in Chr21 UKBB (Change size of regions w in Rscript)
+regions = list(range(6,10)) #Regions in Chr21 UKBB (Change size of regions w in Rscript)
 regions = [str(i) for i in regions]
 #Number of chunks, tells us how many total nSamples to perform (Change nSamples w in Rscript)
 chunks     = list(range(1,2))
@@ -49,17 +49,19 @@ rule all:
         expand("results/UKBB/{paired_values}_AF_pooled_quantile_counts.RData", paired_values = paired_values),
         expand("results/UKBB/{paired_values}_LD_pooled_quantile_counts.RData", paired_values = paired_values)
 
-rule match_panels:
+#rule match_panels:
 #Generate the UKBB and 1000G Panels (On the cluster, this is a new functionality)
-    output:
+    #output:
     #The output will be the matched panels in the matched_panels dir
-        "prior_draw_analysis_panels/regions/matched_panels/1000G_{populations}_region_{regions}_matched_ukbb_ref_panel.haps",
-        "prior_draw_analysis_panels/regions/matched_panels/ukbb_region_{regions}_matched_1000G_{populations}.haps"
-    params:
-        populations = "{populations}",
-        regions     = "{regions}"
-    script:
-        "match_ukbb.R"
+        #"prior_draw_analysis_panels/regions/matched_panels/1000G_{populations}_region_{regions}_matched_ukbb_ref_panel.haps",
+        #"prior_draw_analysis_panels/regions/matched_panels/ukbb_region_{regions}_matched_1000G_{populations}.haps"
+    #params:
+        #populations = "{populations}",
+        #regions     = "{regions}"
+    #conda:
+        #"/well/mcvean/mtutert/snakemake/envs/r.yaml"
+    #script:
+        #"match_ukbb.R"
 
 rule draw_weights:
     input:
@@ -72,6 +74,8 @@ rule draw_weights:
         paired_values    = "{paired_values}",
         regions          = "{regions}",
         chunks           = "{chunks}"
+    conda:
+        "/well/mcvean/mtutert/snakemake/envs/r.yaml"
     script:
         "UKBB_draw_weights.R"
 
@@ -86,6 +90,8 @@ rule calculate_quantiles:
     params:
         regions           = "{regions}",
         paired_values     = "{paired_values}"
+    conda:
+        "/well/mcvean/mtutert/snakemake/envs/r.yaml"
     script:
         "UKBB_calculate_quantiles.R"
 #
@@ -98,6 +104,8 @@ rule pool_quantiles:
         "results/UKBB/{paired_values}_LD_pooled_quantile_counts.RData"
     params:
         paired_values  = "{paired_values}"
+    conda:
+        "/well/mcvean/mtutert/snakemake/envs/r.yaml"
     script:
         "UKBB_pool_quantiles.R"
 

@@ -21,7 +21,7 @@ nsnps = ncol(KG_reference_panel)
 #Run inference
 mbar = 10000 #Change around if necessary! 
 results                             = LD_from_GSHMM(ref_allele_matrix     = KG_reference_panel,
-                                                    fst                   = 0.1,
+                                                    fst                   = 0.001,
                                                     alpha                 = 1e4,
                                                     nSamples              = 5,
                                                     weights_resolution    = 1000,

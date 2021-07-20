@@ -208,11 +208,10 @@ Fst results
     )
   ) 
 
+
 fig <- fig %>%
   layout(
-    xaxis = list(
-      title = "Divergence Time"
-    ),
+    xaxis = list(categoryarray = ~divergence_time_value, categoryorder = "array",title = "Divergence Time"),
     yaxis = list(
       title = "log10 Fst MLE Estimate",
       zeroline = F
@@ -278,7 +277,7 @@ pop_names = c("AMR","AFR","EUR","SAS","EAS")
 pop_column_names = c()
 for (i in 1:length(pop_names)) {
       #Read in the results file
-      file_names = list.files(path = "ukbb_mle_results/", pattern = sprintf("fst_%s_",pop_names[i]), full.names = T)
+      file_names = list.files(path = "ukbb_mle_results/", pattern = sprintf("noise_%s_",pop_names[i]), full.names = T)
       #Load the data
       results          = unlist((lapply(file_names,readRDS)))
       #Get the column names

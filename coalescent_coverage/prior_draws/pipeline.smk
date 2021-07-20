@@ -10,7 +10,7 @@ Note that we may need to add specific things to the profile as we go on the fly-
 import itertools as itertools
 print("Executing snakefile")
 #Hard code in number of replicates for now...but make this flexible later on!
-replicates = list(range(0,10)) #Current max of 25
+replicates = list(range(3,15)) #Current max of 25
 replicates = [str(i) for i in replicates]
 #Number of chunks (each file, total number of samples is chunks * nSamples)
 chunks     = list(range(1,10))
@@ -44,6 +44,8 @@ rule draw_weights:
         replicates        = "{replicates}",
         chunk             = "{chunks}",
         paired_values     = "{paired_values}"
+    conda:
+        "/well/mcvean/mtutert/snakemake/envs/r.yaml"
     script:
         "draw_weights.R"
 
@@ -57,6 +59,8 @@ rule calculate_quantiles:
     params:
         replicates        = "{replicates}",
         paired_values     = "{paired_values}"
+    conda:
+        "/well/mcvean/mtutert/snakemake/envs/r.yaml"
     script:
         "calculate_quantiles.R"
          
@@ -69,15 +73,8 @@ rule pool_quantiles:
         "results/pop_split/{paired_values}_split_AF_pooled_quantile_counts.RData"
     params:
         paired_values     = "{paired_values}"
+    conda:
+        "/well/mcvean/mtutert/snakemake/envs/r.yaml"
     script:
         "pool_quantiles.R"
-# # 
-# rule plot_results:
-#     input:
-#         expand("results/pop_split/{paired_values}_split_LD_pooled_quantile_counts.RData", paired_values = paired_values),
-#         expand("results/pop_split/{paired_values}_split_LD_pooled_quantile_counts.RData", paired_values = paired_values)
-#     output:
-#         "results/grid_qq_plot.jpeg
-#     script:
-#         "plot_results.R"
 

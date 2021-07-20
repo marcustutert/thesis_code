@@ -14,7 +14,7 @@ This code will run the final graphs for the uk-biobank analysis used in chapter 
 
 ```{r Pooling AF UKBB Data}
 #Get the nregions
-nregions    = 5
+nregions    = 220
 #Get the populations
 populations = c("EUR","AFR","EUR_AFR")
 #Get the Fst levels
@@ -33,7 +33,7 @@ for (i in 1:length(populations)) {
      ref_pooled_results      = c()
      gwas_af_pooled_results  = c()
   #Pool the data across the regions
-    for (k in 1:nregions) {   #Loop through the regions
+    for (k in (1:nregions)[-c(seq(from = 120, to = 132))]) {   #Loop through the regions
        #Read in the allele frequency data
         print(sprintf("results/inference_%s_panel_region_%s_fst_%s",populations[i],k,fst[j]))
         results         = readRDS(sprintf("results/inference_%s_panel_region_%s_fst_%s",populations[i],k,fst[j]))
@@ -62,22 +62,46 @@ With this pooled data, plot the results of the Allele frequencies across Fst lev
 ```{r}
 #9 graphs to plot here which we will pool together
 EUR_fst_0.1 <- plot_ly(data =iris, x = ~gwas_af_full[[1]])
-EUR_fst_0.1 <- EUR_fst_0.1 %>% add_trace(y = ~refence_af[[1]], name = 'Reference',mode = 'markers')
-EUR_fst_0.1 <- EUR_fst_0.1 %>% add_trace(y = ~inferred_af[[1]], name = 'Inferred', mode = 'markers')
-EUR_fst_0.1
+EUR_fst_0.1 <- EUR_fst_0.1 %>% add_trace(y = ~refence_af[[1]], name = 'Reference',mode = 'markers',marker = list(opacity = 0.9),opacity = 0.7, color = color[1],showlegend = T)
+EUR_fst_0.1 <- EUR_fst_0.1 %>% add_trace(y = ~inferred_af[[1]], name = 'Inferred', mode = 'markers',marker = list(opacity = 0.9),opacity = 0.7, color = color[2],showlegend = T)
 
+EUR_fst_0.01 <- plot_ly(data =iris, x = ~gwas_af_full[[2]])
+EUR_fst_0.01 <- EUR_fst_0.01 %>% add_trace(y = ~refence_af[[2]], name = 'Reference',mode = 'markers',marker = list(opacity = 0.9),opacity = 0.7, color = color[1],showlegend = F)
+EUR_fst_0.01 <- EUR_fst_0.01 %>% add_trace(y = ~inferred_af[[2]], name = 'Inferred', mode = 'markers',marker = list(opacity = 0.9),opacity = 0.7, color = color[2],showlegend = F)
+
+EUR_fst_0.001 <- plot_ly(data =iris, x = ~gwas_af_full[[3]])
+EUR_fst_0.001 <- EUR_fst_0.001 %>% add_trace(y = ~refence_af[[3]], name = 'Reference',mode = 'markers',marker = list(opacity = 0.9),opacity = 0.7, color = color[1],showlegend = F)
+EUR_fst_0.001 <- EUR_fst_0.001 %>% add_trace(y = ~inferred_af[[3]], name = 'Inferred', mode = 'markers',marker = list(opacity = 0.9),opacity = 0.7, color = color[2],showlegend = F)
 
 AFR_fst_0.1 <- plot_ly(data =iris, x = ~gwas_af_full[[4]])
-AFR_fst_0.1 <- AFR_fst_0.1 %>% add_trace(y = ~refence_af[[4]], name = 'Reference',mode = 'markers')
-AFR_fst_0.1 <- AFR_fst_0.1 %>% add_trace(y = ~inferred_af[[4]], name = 'Inferred', mode = 'markers')
-AFR_fst_0.1
+AFR_fst_0.1 <- AFR_fst_0.1 %>% add_trace(y = ~refence_af[[4]], name = 'Reference',mode = 'markers', marker = list(opacity = 0.9),opacity = 0.7, color = color[1],showlegend = F)
+AFR_fst_0.1 <- AFR_fst_0.1 %>% add_trace(y = ~inferred_af[[4]], name = 'Inferred', mode = 'markers', marker = list(opacity = 0.9),opacity = 0.7, color = color[2],showlegend = F)
 
-AFR_fst_0.1 <- plot_ly(data =iris, x = ~gwas_af_full[[7]])
-AFR_fst_0.1 <- AFR_fst_0.1 %>% add_trace(y = ~refence_af[[7]], name = 'Reference',mode = 'markers')
-AFR_fst_0.1 <- AFR_fst_0.1 %>% add_trace(y = ~inferred_af[[7]], name = 'Inferred', mode = 'markers')
-AFR_fst_0.1
+AFR_fst_0.01 <- plot_ly(data =iris, x = ~gwas_af_full[[5]])
+AFR_fst_0.01 <- AFR_fst_0.01 %>% add_trace(y = ~refence_af[[5]], name = 'Reference',mode = 'markers', marker = list(opacity = 0.9),opacity = 0.7, color = color[1],showlegend = F)
+AFR_fst_0.01 <- AFR_fst_0.01 %>% add_trace(y = ~inferred_af[[5]], name = 'Inferred', mode = 'markers', marker = list(opacity = 0.9),opacity = 0.7, color = color[2],showlegend = F)
 
-#FINISH PLOTTING THESE GRAPHS AFTER LUNCH
+AFR_fst_0.001 <- plot_ly(data =iris, x = ~gwas_af_full[[6]])
+AFR_fst_0.001 <- AFR_fst_0.001 %>% add_trace(y = ~refence_af[[6]], name = 'Reference',mode = 'markers', marker = list(opacity = 0.9),opacity = 0.7, color = color[1],showlegend = F)
+AFR_fst_0.001 <- AFR_fst_0.001 %>% add_trace(y = ~inferred_af[[6]], name = 'Inferred', mode = 'markers', marker = list(opacity = 0.9),opacity = 0.7, color = color[2],showlegend = F)
+
+EUR_AFR_fst_0.1 <- plot_ly(data =iris, x = ~gwas_af_full[[7]])
+EUR_AFR_fst_0.1 <- EUR_AFR_fst_0.1 %>% add_trace(y = ~refence_af[[7]], name = 'Reference',mode = 'markers', marker = list(opacity = 0.9),opacity = 0.7, color = color[1],showlegend = F)
+EUR_AFR_fst_0.1 <- EUR_AFR_fst_0.1 %>% add_trace(y = ~inferred_af[[7]], name = 'Inferred', mode = 'markers',marker = list(opacity = 0.9),opacity = 0.7, color = color[2],showlegend = F)
+
+EUR_AFR_fst_0.01 <- plot_ly(data =iris, x = ~gwas_af_full[[8]])
+EUR_AFR_fst_0.01 <- EUR_AFR_fst_0.01 %>% add_trace(y = ~refence_af[[8]], name = 'Reference',mode = 'markers', marker = list(opacity = 0.9),opacity = 0.7, color = color[1],showlegend = F)
+EUR_AFR_fst_0.01 <- EUR_AFR_fst_0.01 %>% add_trace(y = ~inferred_af[[8]], name = 'Inferred', mode = 'markers', marker = list(opacity = 0.9),opacity = 0.7, color = color[2],showlegend = F)
+
+EUR_AFR_fst_0.001 <- plot_ly(data =iris, x = ~gwas_af_full[[9]])
+EUR_AFR_fst_0.001 <- EUR_AFR_fst_0.001 %>% add_trace(y = ~refence_af[[9]], name = 'Reference',mode = 'markers',marker = list(opacity = 0.9),opacity = 0.7, color = color[1],showlegend = F)
+EUR_AFR_fst_0.001 <- EUR_AFR_fst_0.001 %>% add_trace(y = ~inferred_af[[9]], name = 'Inferred', mode = 'markers', marker = list(opacity = 0.9),opacity = 0.7, color = color[2],showlegend = F)
+
+fig <- subplot(EUR_fst_0.1, AFR_fst_0.1,EUR_AFR_fst_0.1,
+               EUR_fst_0.01, AFR_fst_0.01,EUR_AFR_fst_0.01,
+               EUR_fst_0.001, AFR_fst_0.001,EUR_AFR_fst_0.001,
+               nrows = 3, shareX = T, shareY = T)
+fig
 
 ```
 
@@ -147,52 +171,270 @@ for (i in 1:length(populations)) {
 Plot the LD but SUBSAMPLE
 
 ```{r Plot the LD}
-colors = brewer.pal(length(2),name = "Dark2")
+library(RColorBrewer)
+library(plotly)
+color = brewer.pal(n = 5,name = "Set2")
 nindexes = length(gwas_ld_full[[1]])
-indexes = sample(x = seq(1:nindexes),size = 5000)
+indexes = sample(x = seq(1:nindexes),size = 1000)
 
 EUR_fst_0.1_ld <- plot_ly(data =iris, x = ~gwas_ld_full[[1]][indexes])
-EUR_fst_0.1_ld <- EUR_fst_0.1_ld %>% add_trace(y = ~refence_ld[[1]][indexes], name = 'Reference',mode = 'markers', marker = list(opacity = 0.9),opacity = 0.7)
-EUR_fst_0.1_ld <- EUR_fst_0.1_ld %>% add_trace(y = ~inferred_ld[[1]][indexes], name = 'Inferred', mode = 'markers',marker = list(opacity = 0.9),opacity = 0.7)
+EUR_fst_0.1_ld <- EUR_fst_0.1_ld %>% add_trace(y = ~refence_ld[[1]][indexes], name = 'Reference',mode = 'markers', marker = list(opacity = 0.9),opacity = 0.7, color = color[1],showlegend = T)
+EUR_fst_0.1_ld <- EUR_fst_0.1_ld %>% add_trace(y = ~inferred_ld[[1]][indexes], name = 'Inferred', mode = 'markers',marker = list(opacity = 0.9),opacity = 0.7, color = color[2],showlegend = T)
 
 EUR_fst_0.01_ld <- plot_ly(data =iris, x = ~gwas_ld_full[[2]][indexes])
-EUR_fst_0.01_ld <- EUR_fst_0.01_ld %>% add_trace(y = ~refence_ld[[2]][indexes], name = 'Reference',mode = 'markers', marker = list(opacity = 0.9),opacity = 0.7)
-EUR_fst_0.01_ld <- EUR_fst_0.01_ld %>% add_trace(y = ~inferred_ld[[2]][indexes], name = 'Inferred', mode = 'markers',marker = list(opacity = 0.9),opacity = 0.7)
+EUR_fst_0.01_ld <- EUR_fst_0.01_ld %>% add_trace(y = ~refence_ld[[2]][indexes], name = 'Reference',mode = 'markers', marker = list(opacity = 0.9),opacity = 0.7, color = color[1],showlegend = F)
+EUR_fst_0.01_ld <- EUR_fst_0.01_ld %>% add_trace(y = ~inferred_ld[[2]][indexes], name = 'Inferred', mode = 'markers',marker = list(opacity = 0.9),opacity = 0.7, color = color[2],showlegend = F)
 
 EUR_fst_0.001_ld <- plot_ly(data =iris, x = ~gwas_ld_full[[3]][indexes])
-EUR_fst_0.001_ld <- EUR_fst_0.001_ld %>% add_trace(y = ~refence_ld[[3]][indexes], name = 'Reference',mode = 'markers', marker = list(opacity = 0.9),opacity = 0.7)
-EUR_fst_0.001_ld <- EUR_fst_0.001_ld %>% add_trace(y = ~inferred_ld[[3]][indexes], name = 'Inferred', mode = 'markers',marker = list(opacity = 0.9),opacity = 0.7)
+EUR_fst_0.001_ld <- EUR_fst_0.001_ld %>% add_trace(y = ~refence_ld[[3]][indexes], name = 'Reference',mode = 'markers', marker = list(opacity = 0.9),opacity = 0.7, color = color[1],showlegend = F)
+EUR_fst_0.001_ld <- EUR_fst_0.001_ld %>% add_trace(y = ~inferred_ld[[3]][indexes], name = 'Inferred', mode = 'markers',marker = list(opacity = 0.9),opacity = 0.7, color = color[2],showlegend = F)
 
 
 AFR_fst_0.1_ld <- plot_ly(data =iris, x = ~gwas_ld_full[[4]][indexes])
-AFR_fst_0.1_ld <- AFR_fst_0.1_ld %>% add_trace(y = ~refence_ld[[4]][indexes], name = 'Reference',mode = 'markers', marker = list(opacity = 0.9),opacity = 0.7, colors = colors[1])
-AFR_fst_0.1_ld <- AFR_fst_0.1_ld %>% add_trace(y = ~inferred_ld[[4]][indexes], name = 'Inferred', mode = 'markers',marker = list(opacity = 0.9),opacity = 0.7, colors = colors[2])
+AFR_fst_0.1_ld <- AFR_fst_0.1_ld %>% add_trace(y = ~refence_ld[[4]][indexes], name = 'Reference',mode = 'markers', marker = list(opacity = 0.9),opacity = 0.7, color = color[1],showlegend = F)
+AFR_fst_0.1_ld <- AFR_fst_0.1_ld %>% add_trace(y = ~inferred_ld[[4]][indexes], name = 'Inferred', mode = 'markers',marker = list(opacity = 0.9),opacity = 0.7, color = color[2],showlegend = F)
 
 AFR_fst_0.01_ld <- plot_ly(data =iris, x = ~gwas_ld_full[[5]][indexes])
-AFR_fst_0.01_ld <- AFR_fst_0.01_ld %>% add_trace(y = ~refence_ld[[5]][indexes], name = 'Reference',mode = 'markers', marker = list(opacity = 0.9),opacity = 0.7, colors = colors[1])
-AFR_fst_0.01_ld <- AFR_fst_0.01_ld %>% add_trace(y = ~inferred_ld[[5]][indexes], name = 'Inferred', mode = 'markers',marker = list(opacity = 0.9),opacity = 0.7, colors = colors[2])
+AFR_fst_0.01_ld <- AFR_fst_0.01_ld %>% add_trace(y = ~refence_ld[[5]][indexes], name = 'Reference',mode = 'markers', marker = list(opacity = 0.9),opacity = 0.7, color = color[1],showlegend = F)
+AFR_fst_0.01_ld <- AFR_fst_0.01_ld %>% add_trace(y = ~inferred_ld[[5]][indexes], name = 'Inferred', mode = 'markers',marker = list(opacity = 0.9),opacity = 0.7, color = color[2],showlegend = F)
 
 AFR_fst_0.001_ld <- plot_ly(data =iris, x = ~gwas_ld_full[[6]][indexes])
-AFR_fst_0.001_ld <- AFR_fst_0.001_ld %>% add_trace(y = ~refence_ld[[6]][indexes], name = 'Reference',mode = 'markers', marker = list(opacity = 0.9),opacity = 0.7, colors = colors[1])
-AFR_fst_0.001_ld <- AFR_fst_0.001_ld %>% add_trace(y = ~inferred_ld[[6]][indexes], name = 'Inferred', mode = 'markers',marker = list(opacity = 0.9),opacity = 0.7, colors = colors[2])
+AFR_fst_0.001_ld <- AFR_fst_0.001_ld %>% add_trace(y = ~refence_ld[[6]][indexes], name = 'Reference',mode = 'markers', marker = list(opacity = 0.9),opacity = 0.7, color = color[1],showlegend = F)
+AFR_fst_0.001_ld <- AFR_fst_0.001_ld %>% add_trace(y = ~inferred_ld[[6]][indexes], name = 'Inferred', mode = 'markers',marker = list(opacity = 0.9),opacity = 0.7, color = color[2],showlegend = F)
 
 EUR_AFR_fst_0.1_ld <- plot_ly(data =iris, x = ~gwas_ld_full[[7]][indexes])
-EUR_AFR_fst_0.1_ld <- EUR_AFR_fst_0.1_ld %>% add_trace(y = ~refence_ld[[7]][indexes], name = 'Reference',mode = 'markers', marker = list(opacity = 0.9),opacity = 0.7, colors = colors[1])
-EUR_AFR_fst_0.1_ld <- EUR_AFR_fst_0.1_ld %>% add_trace(y = ~inferred_ld[[7]][indexes], name = 'Inferred', mode = 'markers',marker = list(opacity = 0.9),opacity = 0.7, colors = colors[2])
+EUR_AFR_fst_0.1_ld <- EUR_AFR_fst_0.1_ld %>% add_trace(y = ~refence_ld[[7]][indexes], name = 'Reference',mode = 'markers', marker = list(opacity = 0.9),opacity = 0.7, color = color[1],showlegend = F)
+EUR_AFR_fst_0.1_ld <- EUR_AFR_fst_0.1_ld %>% add_trace(y = ~inferred_ld[[7]][indexes], name = 'Inferred', mode = 'markers',marker = list(opacity = 0.9),opacity = 0.7, color = color[2],showlegend = F)
 
-EUR_AFR_fst_0.01_ld <- plot_ly(data =iris, x = ~gwas_ld_full[[7]][indexes])
-EUR_AFR_fst_0.01_ld <- EUR_AFR_fst_0.01_ld %>% add_trace(y = ~refence_ld[[7]][indexes], name = 'Reference',mode = 'markers', marker = list(opacity = 0.9),opacity = 0.7, colors = colors[1])
-EUR_AFR_fst_0.01_ld <- EUR_AFR_fst_0.01_ld %>% add_trace(y = ~inferred_ld[[7]][indexes], name = 'Inferred', mode = 'markers',marker = list(opacity = 0.9),opacity = 0.7, colors = colors[2])
+EUR_AFR_fst_0.01_ld <- plot_ly(data =iris, x = ~gwas_ld_full[[8]][indexes])
+EUR_AFR_fst_0.01_ld <- EUR_AFR_fst_0.01_ld %>% add_trace(y = ~refence_ld[[8]][indexes], name = 'Reference',mode = 'markers', marker = list(opacity = 0.9),opacity = 0.7, color = color[1],showlegend = F)
+EUR_AFR_fst_0.01_ld <- EUR_AFR_fst_0.01_ld %>% add_trace(y = ~inferred_ld[[8]][indexes], name = 'Inferred', mode = 'markers',marker = list(opacity = 0.9),opacity = 0.7, color = color[2],showlegend = F)
 
-EUR_AFR_fst_0.001_ld <- plot_ly(data =iris, x = ~gwas_ld_full[[7]][indexes])
-EUR_AFR_fst_0.001_ld <- EUR_AFR_fst_0.001_ld %>% add_trace(y = ~refence_ld[[7]][indexes], name = 'Reference',mode = 'markers', marker = list(opacity = 0.9),opacity = 0.7, colors = colors[1])
-EUR_AFR_fst_0.001_ld <- EUR_AFR_fst_0.001_ld %>% add_trace(y = ~inferred_ld[[7]][indexes], name = 'Inferred', mode = 'markers',marker = list(opacity = 0.9),opacity = 0.7, colors = colors[2])
+EUR_AFR_fst_0.001_ld <- plot_ly(data =iris, x = ~gwas_ld_full[[9]][indexes])
+EUR_AFR_fst_0.001_ld <- EUR_AFR_fst_0.001_ld %>% add_trace(y = ~refence_ld[[9]][indexes], name = 'Reference',mode = 'markers', marker = list(opacity = 0.9),opacity = 0.7, color = color[1],showlegend = F)
+EUR_AFR_fst_0.001_ld <- EUR_AFR_fst_0.001_ld %>% add_trace(y = ~inferred_ld[[9]][indexes], name = 'Inferred', mode = 'markers',marker = list(opacity = 0.9),opacity = 0.7, color = color[2],showlegend = F)
 
 
 fig <- subplot(EUR_fst_0.1_ld, AFR_fst_0.1_ld,EUR_AFR_fst_0.1_ld,
                EUR_fst_0.01_ld, AFR_fst_0.01_ld,EUR_AFR_fst_0.01_ld,
                EUR_fst_0.001_ld, AFR_fst_0.001_ld,EUR_AFR_fst_0.001_ld,
-               nrows = 3)
+               nrows = 3, shareX = T, shareY = T)
 fig
+```
+
+Get the r2 of the correlation for the AFs
+
+```{r AF r2 correlation}
+#Get the accuracy of the allele frequencies for different test cases
+
+#ALL SNPS
+#Overall r2 for EUR panel Reference 
+print(sprintf("GWAS~Ref (EUR) Full r2 %s", summary(lm(gwas_af_full[[1]]~refence_af[[1]]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.1 (EUR) Full r2 %s", summary(lm(gwas_af_full[[1]]~inferred_af[[1]]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.01 (EUR) Full r2 %s", summary(lm(gwas_af_full[[2]]~inferred_af[[2]]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.001 (EUR) Full r2 %s", summary(lm(gwas_af_full[[3]]~inferred_af[[3]]))$r.squared))
+#Overall r2 for AFR Panel Reference
+print(sprintf("GWAS~Ref (AFR) Full r2 %s", summary(lm(gwas_af_full[[4]]~refence_af[[4]]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.1 (AFR) Full r2 %s", summary(lm(gwas_af_full[[4]]~inferred_af[[4]]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.01 (AFR) Full r2 %s", summary(lm(gwas_af_full[[5]]~inferred_af[[5]]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.001 (AFR) Full r2 %s", summary(lm(gwas_af_full[[6]]~inferred_af[[6]]))$r.squared))
+#Overall r2 for EUR+AFR Panel Reference
+print(sprintf("GWAS~Ref (EUR+AFR) Full r2 %s", summary(lm(gwas_af_full[[7]]~refence_af[[7]]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.1 (EUR+AFR) Full r2 %s", summary(lm(gwas_af_full[[7]]~inferred_af[[7]]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.01 (EUR+AFR) Full r2 %s", summary(lm(gwas_af_full[[8]]~inferred_af[[8]]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.001 (EUR+AFR) Full r2 %s", summary(lm(gwas_af_full[[9]]~inferred_af[[9]]))$r.squared))
+
+#Find all low frequency variants 
+lf_index_1 = which((gwas_af_full[[1]] < 0.4))
+lf_index_2 = which((gwas_af_full[[1]] > 0.6))
+lf_index = c(lf_index_1,lf_index_2)
+print(sprintf("GWAS~Ref (EUR) Low r2 %s", summary(lm(gwas_af_full[[1]][lf_index]~refence_af[[1]][lf_index]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.1 (EUR) Low r2 %s", summary(lm(gwas_af_full[[1]][lf_index]~inferred_af[[1]][lf_index]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.01 (EUR) Low r2 %s", summary(lm(gwas_af_full[[2]][lf_index]~inferred_af[[2]][lf_index]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.001 (EUR) Low r2 %s", summary(lm(gwas_af_full[[3]][lf_index]~inferred_af[[3]][lf_index]))$r.squared))
+#Overall r2 for AFR Panel Reference
+print(sprintf("GWAS~Ref (AFR) Low r2 %s", summary(lm(gwas_af_full[[4]][lf_index]~refence_af[[4]][lf_index]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.1 (AFR) Low r2 %s", summary(lm(gwas_af_full[[4]][lf_index]~inferred_af[[4]][lf_index]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.01 (AFR) Low r2 %s", summary(lm(gwas_af_full[[5]][lf_index]~inferred_af[[5]][lf_index]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.001 (AFR) Low r2 %s", summary(lm(gwas_af_full[[6]][lf_index]~inferred_af[[6]][lf_index]))$r.squared))
+#Overall r2 for EUR+AFR Panel Reference
+print(sprintf("GWAS~Ref (EUR+AFR) Full r2 %s", summary(lm(gwas_af_full[[7]][lf_index]~refence_af[[7]][lf_index]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.1 (EUR+AFR) Low r2 %s", summary(lm(gwas_af_full[[7]][lf_index]~inferred_af[[7]][lf_index]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.01 (EUR+AFR) Low r2 %s", summary(lm(gwas_af_full[[8]][lf_index]~inferred_af[[8]][lf_index]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.001 (EUR+AFR) Low r2 %s", summary(lm(gwas_af_full[[9]][lf_index]~inferred_af[[9]][lf_index]))$r.squared))
+
+#Find all high frequency variants
+hf_index_1 = which((gwas_af_full[[1]] > 0.4))
+hf_index_2 = which((gwas_af_full[[1]] < 0.6))
+hf_index = intersect(hf_index_1,hf_index_2)
+print(sprintf("GWAS~Ref (EUR) Common r2 %s", summary(lm(gwas_af_full[[1]][hf_index]~refence_af[[1]][hf_index]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.1 (EUR) Common r2 %s", summary(lm(gwas_af_full[[1]][hf_index]~inferred_af[[1]][hf_index]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.01 (EUR) Common r2 %s", summary(lm(gwas_af_full[[2]][hf_index]~inferred_af[[2]][hf_index]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.001 (EUR) Common r2 %s", summary(lm(gwas_af_full[[3]][hf_index]~inferred_af[[3]][hf_index]))$r.squared))
+#Overall r2 for AFR Panel Reference
+print(sprintf("GWAS~Ref (AFR) Low r2 %s", summary(lm(gwas_af_full[[4]][hf_index]~refence_af[[4]][hf_index]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.1 (AFR) Common r2 %s", summary(lm(gwas_af_full[[4]][hf_index]~inferred_af[[4]][hf_index]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.01 (AFR) Common r2 %s", summary(lm(gwas_af_full[[5]][hf_index]~inferred_af[[5]][hf_index]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.001 (AFR) Common r2 %s", summary(lm(gwas_af_full[[6]][hf_index]~inferred_af[[6]][hf_index]))$r.squared))
+#Overall r2 for EUR+AFR Panel Reference
+print(sprintf("GWAS~Ref (EUR+AFR) Full r2 %s", summary(lm(gwas_af_full[[7]][hf_index]~refence_af[[7]][hf_index]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.1 (EUR+AFR) Common r2 %s", summary(lm(gwas_af_full[[7]][hf_index]~inferred_af[[7]][hf_index]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.01 (EUR+AFR) Common r2 %s", summary(lm(gwas_af_full[[8]][hf_index]~inferred_af[[8]][hf_index]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.001 (EUR+AFR) Common r2 %s", summary(lm(gwas_af_full[[9]][hf_index]~inferred_af[[9]][hf_index]))$r.squared))
+
+
+```
+
+Now do the LD analysis
+
+```{r}
+#Get the accuracy of the allele frequencies for different test cases
+#ALL SNPS
+#Overall r2 for EUR panel Reference 
+print(sprintf("GWAS~Ref (EUR) Full r2 %s", summary(lm(gwas_ld_full[[1]]~refence_ld[[1]]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.1 (EUR) Full r2 %s", summary(lm(gwas_ld_full[[1]]~inferred_ld[[1]]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.01 (EUR) Full r2 %s", summary(lm(gwas_ld_full[[2]]~inferred_ld[[2]]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.001 (EUR) Full r2 %s", summary(lm(gwas_ld_full[[3]]~inferred_ld[[3]]))$r.squared))
+#Overall r2 for AFR Panel Reference
+print(sprintf("GWAS~Ref (AFR) Full r2 %s", summary(lm(gwas_ld_full[[4]]~refence_ld[[4]]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.1 (AFR) Full r2 %s", summary(lm(gwas_ld_full[[4]]~inferred_ld[[4]]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.01 (AFR) Full r2 %s", summary(lm(gwas_ld_full[[5]]~inferred_ld[[5]]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.001 (AFR) Full r2 %s", summary(lm(gwas_ld_full[[6]]~inferred_ld[[6]]))$r.squared))
+#Overall r2 for EUR+AFR Panel Reference
+print(sprintf("GWAS~Ref (EUR+AFR) Full r2 %s", summary(lm(gwas_ld_full[[7]]~refence_ld[[7]]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.1 (EUR+AFR) Full r2 %s", summary(lm(gwas_ld_full[[7]]~inferred_ld[[7]]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.01 (EUR+AFR) Full r2 %s", summary(lm(gwas_ld_full[[8]]~inferred_ld[[8]]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.001 (EUR+AFR) Full r2 %s", summary(lm(gwas_ld_full[[9]]~inferred_ld[[9]]))$r.squared))
+
+#Find all low frequency variants 
+lf_index_1 = which((gwas_ld_full[[1]] < 0.3))
+#lf_index_2 = which((gwas_ld_full[[1]] > 0.6))
+lf_index = c(lf_index_1)
+print(sprintf("GWAS~Ref (EUR) Low r2 %s", summary(lm(gwas_ld_full[[1]][lf_index]~refence_ld[[1]][lf_index]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.1 (EUR) Low r2 %s", summary(lm(gwas_ld_full[[1]][lf_index]~inferred_ld[[1]][lf_index]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.01 (EUR) Low r2 %s", summary(lm(gwas_ld_full[[2]][lf_index]~inferred_ld[[2]][lf_index]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.001 (EUR) Low r2 %s", summary(lm(gwas_ld_full[[3]][lf_index]~inferred_ld[[3]][lf_index]))$r.squared))
+#Overall r2 for AFR Panel Reference
+print(sprintf("GWAS~Ref (AFR) Low r2 %s", summary(lm(gwas_ld_full[[4]][lf_index]~refence_ld[[4]][lf_index]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.1 (AFR) Low r2 %s", summary(lm(gwas_ld_full[[4]][lf_index]~inferred_ld[[4]][lf_index]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.01 (AFR) Low r2 %s", summary(lm(gwas_ld_full[[5]][lf_index]~inferred_ld[[5]][lf_index]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.001 (AFR) Low r2 %s", summary(lm(gwas_ld_full[[6]][lf_index]~inferred_ld[[6]][lf_index]))$r.squared))
+#Overall r2 for EUR+AFR Panel Reference
+print(sprintf("GWAS~Ref (EUR+AFR) Full r2 %s", summary(lm(gwas_ld_full[[7]][lf_index]~refence_ld[[7]][lf_index]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.1 (EUR+AFR) Low r2 %s", summary(lm(gwas_ld_full[[7]][lf_index]~inferred_ld[[7]][lf_index]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.01 (EUR+AFR) Low r2 %s", summary(lm(gwas_ld_full[[8]][lf_index]~inferred_ld[[8]][lf_index]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.001 (EUR+AFR) Low r2 %s", summary(lm(gwas_ld_full[[9]][lf_index]~inferred_ld[[9]][lf_index]))$r.squared))
+
+#Find all high frequency variants
+hf_index_1 = which((gwas_ld_full[[1]] > 0.3))
+#hf_index_2 = which((gwas_ld_full[[1]] < 0.6))
+hf_index = c(hf_index_1)
+print(sprintf("GWAS~Ref (EUR) Common r2 %s", summary(lm(gwas_ld_full[[1]][hf_index]~refence_ld[[1]][hf_index]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.1 (EUR) Common r2 %s", summary(lm(gwas_ld_full[[1]][hf_index]~inferred_ld[[1]][hf_index]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.01 (EUR) Common r2 %s", summary(lm(gwas_ld_full[[2]][hf_index]~inferred_ld[[2]][hf_index]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.001 (EUR) Common r2 %s", summary(lm(gwas_ld_full[[3]][hf_index]~inferred_ld[[3]][hf_index]))$r.squared))
+#Overall r2 for AFR Panel Reference
+print(sprintf("GWAS~Ref (AFR) Low r2 %s", summary(lm(gwas_ld_full[[4]][hf_index]~refence_ld[[4]][hf_index]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.1 (AFR) Common r2 %s", summary(lm(gwas_ld_full[[4]][hf_index]~inferred_ld[[4]][hf_index]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.01 (AFR) Common r2 %s", summary(lm(gwas_ld_full[[5]][hf_index]~inferred_ld[[5]][hf_index]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.001 (AFR) Common r2 %s", summary(lm(gwas_ld_full[[6]][hf_index]~inferred_ld[[6]][hf_index]))$r.squared))
+#Overall r2 for EUR+AFR Panel Reference
+print(sprintf("GWAS~Ref (EUR+AFR) Full r2 %s", summary(lm(gwas_ld_full[[7]][hf_index]~refence_ld[[7]][hf_index]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.1 (EUR+AFR) Common r2 %s", summary(lm(gwas_ld_full[[7]][hf_index]~inferred_ld[[7]][hf_index]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.01 (EUR+AFR) Common r2 %s", summary(lm(gwas_ld_full[[8]][hf_index]~inferred_ld[[8]][hf_index]))$r.squared))
+print(sprintf("GWAS~Inferred Fst 0.001 (EUR+AFR) Common r2 %s", summary(lm(gwas_ld_full[[9]][hf_index]~inferred_ld[[9]][hf_index]))$r.squared))
+
+```
+
+
+Do the LD shrinkage (pick a good value)
+
+```{r}
+library(RColorBrewer)
+library(plotly)
+color = brewer.pal(n = 5,name = "Set2")
+nindexes = length(gwas_ld_full[[1]])
+indexes = sample(x = seq(1:nindexes),size = 5000)
+
+#Get the nregions
+nregions    = 20
+#Get the populations
+populations = c("EUR","AFR","EUR_AFR")
+#Get the Fst levels
+fst         = c(0.1,0.01,0.001)
+#Store the allele frequencies (inferred) in a list of length 9 (3x3)
+inferred_ld = list()
+refence_ld  = list()
+gwas_ld_full= list()
+#Loop through the 3 populations
+counter = 0
+for (i in 1:length(populations)) {
+  for (j in 1:length(fst)) { #Loop through the fst
+     counter = counter + 1
+     inferred_pooled_results = c()
+     ref_pooled_results      = c()
+     gwas_ld_pooled_results  = c()
+  #Pool the data across the regions
+    for (k in 1:nregions) {   #Loop through the regions
+       #Read in the allele frequency data
+        results         = readRDS(sprintf("results/inference_%s_panel_region_%s_fst_%s",populations[i],k,fst[j]))
+        sumstats        = readRDS(sprintf("data/segemented_regions/%s_sumstats_region_%s",populations[i],k))
+        reference_haps  = readRDS(sprintf("data/segemented_regions/%s_ref_hap_panel_region_%s",populations[i],k))
+        
+        shrink.fac = 0.025
+        nsnps = ncol(reference_haps)
+        ii<-1:nsnps;
+        im<-array(ii,c(nsnps,nsnps));
+        del<-exp(-abs(im - t(im))*shrink.fac)
+        
+        #Read in the reference LD as a vector
+        ref_ld                  = c(LD_Matrix(reference_haps))
+        ref_pooled_results      = c(ref_pooled_results,ref_ld)
+        #Read in the GWAS LD
+        gwas_ld                 = c(as.matrix(fread(sprintf("data/ld_across_regions/ld_region_%s.ld",k))))
+        gwas_ld_pooled_results  = c(gwas_ld_pooled_results,gwas_ld)
+        #Calculate the inferred LD
+        #Get my allele frequencies averaged out over the last 90% of the samples
+        updates         = ncol(results$inferred_af_given_weights)
+        #Get the average of the weights across this region
+        avg_posterior_weights      = c(rowMeans(results$Gibbs_Array[,(.9*updates):updates]))
+        #Calculate the LD accordingky
+        inferred_ld_region  = c(del*cov.wt(x = reference_haps,wt = avg_posterior_weights,cor = T)$cor)
+        inferred_pooled_results = c(inferred_pooled_results,inferred_ld_region)
+      }
+     print(counter)
+     inferred_ld[[counter]]  = inferred_pooled_results
+     refence_ld[[counter]]   = ref_pooled_results
+     gwas_ld_full[[counter]] = gwas_ld_pooled_results
+  }
+}
+#Consider the case of low Fst
+#Now apply this shrinkage for low Fst
+
+EUR_fst_0.001_ld <- plot_ly(data =iris, x = ~gwas_ld_full[[3]][indexes])
+EUR_fst_0.001_ld <- EUR_fst_0.001_ld %>% add_trace(y = ~refence_ld[[3]][indexes], name = 'Reference',mode = 'markers', marker = list(opacity = 0.9),opacity = 0.7, color = color[1],showlegend = T)
+EUR_fst_0.001_ld <- EUR_fst_0.001_ld %>% add_trace(y = ~inferred_ld[[3]][indexes], name = 'Inferred', mode = 'markers',marker = list(opacity = 0.9),opacity = 0.7, color = color[2],showlegend = T)
+EUR_fst_0.001_ld
+print(summary(lm(refence_ld[[3]]~gwas_ld_full[[3]]))$r.squared)
+print(summary(lm(inferred_ld[[3]]~gwas_ld_full[[3]]))$r.squared)
+
+AFR_fst_0.001_ld <- plot_ly(data =iris, x = ~gwas_ld_full[[6]][indexes])
+AFR_fst_0.001_ld <- AFR_fst_0.001_ld %>% add_trace(y = ~refence_ld[[6]][indexes], name = 'Reference',mode = 'markers', marker = list(opacity = 0.9),opacity = 0.7, color = color[1],showlegend = F)
+AFR_fst_0.001_ld <- AFR_fst_0.001_ld %>% add_trace(y = ~inferred_ld[[6]][indexes], name = 'Inferred', mode = 'markers',marker = list(opacity = 0.9),opacity = 0.7, color = color[2],showlegend = F)
+AFR_fst_0.001_ld
+print(summary(lm(refence_ld[[6]]~gwas_ld_full[[6]]))$r.squared)
+print(summary(lm(inferred_ld[[6]]~gwas_ld_full[[6]]))$r.squared)
+
+EUR_AFR_fst_0.001_ld <- plot_ly(data =iris, x = ~gwas_ld_full[[9]][indexes])
+EUR_AFR_fst_0.001_ld <- EUR_AFR_fst_0.001_ld %>% add_trace(y = ~refence_ld[[9]][indexes], name = 'Reference',mode = 'markers', marker = list(opacity = 0.9),opacity = 0.7, color = color[1],showlegend = F)
+EUR_AFR_fst_0.001_ld <- EUR_AFR_fst_0.001_ld %>% add_trace(y = ~inferred_ld[[9]][indexes], name = 'Inferred', mode = 'markers',marker = list(opacity = 0.9),opacity = 0.7, color = color[2],showlegend = F)
+EUR_AFR_fst_0.001_ld
+print(summary(lm(refence_ld[[9]]~gwas_ld_full[[9]]))$r.squared)
+print(summary(lm(inferred_ld[[9]]~gwas_ld_full[[9]]))$r.squared)
+
+fig <- subplot(EUR_fst_0.001_ld, AFR_fst_0.001_ld,EUR_AFR_fst_0.001_ld, shareX = T, shareY = T)
+fig
+
+#Get the r2 summary values between the adjusted values
 ```
 

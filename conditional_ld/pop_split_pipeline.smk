@@ -1,20 +1,12 @@
 """
-#########README##########
-Running the simulations of the finemapping across different patterns of LD (with summary statistics imputation!)
-We run this file on the directory:  /well/mcvean/mtutert/thesis/finemapping
-snakemake --snakefile PATH/TO/SNAKEMAKE-j 10000 --max-status-checks-per-second 0.01 --profile /well/mcvean/mtutert/snakemake/profile -f --rerun-incomplete -n
-
-####README#####
-If signal is FALSE: only run rules up to pool pool_sumstat_imputation
-If signal is TRUE run all rules
 
 """
 import itertools as itertools
 print("Executing snakefile")
 
 #Run the simulation across different number of replicates
-divergence_time             = ["10","20","50"]         #Ask Rao how to not have this be hard-coded in
-recombination_rate          = ["1e-3","1e-4","1e-5"]
+divergence_time             = ["0"]        #Ask Rao how to not have this be hard-coded in
+recombination_rate          = ["1","10","100"]
 
 rule all:
     input:

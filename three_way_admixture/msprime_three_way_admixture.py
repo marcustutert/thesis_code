@@ -91,7 +91,7 @@ np.savetxt("msprime_data/recombination_rate", recomb_rate, newline=" ")
 np.savetxt("msprime_data/recombination_map", recomb_map, newline=" ")
 
 #### Loop Across the replicates (regions) ####
-for i in range(1,nreplicates):
+for i in range(180,nreplicates):
   tree       = msprime.sim_ancestry(recombination_rate = rate_map,          
                                     sequence_length    = sequence_length,          
                                     demography         = demography,    #Use the demographic history from above

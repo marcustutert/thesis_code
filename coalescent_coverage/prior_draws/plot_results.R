@@ -1,22 +1,46 @@
-#Plot results
+#Plot results as a grid across the results
 library(plotly)
-#Don't hard code this in, import it directly from snakemake
-divergence_times = c('0','10','50',"125")
 
 #Read in results file (across all divergence times)
 AF      = list()
-AF_Plot = list()
 LD      = list()
 
-for (i in 1:4) {
-  AF[[i]] = readRDS(sprintf("results/split_%s_AF_pooled_quantile_counts.RData",divergence_times[i]))
-  LD[[i]] = readRDS(sprintf("results/split_%s_LD_pooled_quantile_counts.RData",divergence_times[i]))
-  #Plot results
-  ld_plot  = unlist(LD[[i]])
-  ld_plot  = ld_plot[!is.na(ld_plot)]
-  LD[[i]] = plot_ly(x = ~ld_plot, type = "histogram")
-  export(LD[[i]], file = sprintf("results/%s_LD_result.jpeg", divergence_times[i]))
-  export(unlist(AF[[i]]), file = sprintf("results/%s_AF_result.jpeg", divergence_times[i]))
-  
+#Read in all the pooled quantile data (both the AFs and the LD)
+paired_values = c("0_0.0012",    "0_0.0052",   "0_0.0211",   "0_0.0506",
+                  "10_0.0012",   "10_0.0052",  "10_0.0211",  "10_0.0506",
+                  "50_0.0012",   "50_0.0052",  "50_0.0211",  "50_0.0506",
+                  "125_0.0012",  "125_0.0052", "125_0.0211", "125_0.0506")
+
+
+par(mfrow = c(4, 4))
+#Plot AFs
+for (i in 1:length(paired_values)) {
+  print(paired_values[i])
+  file = sprintf("results/pop_split/%s_split_AF_pooled_quantile_counts.RData",paired_values[i])
+  AF[[i]] = readRDS(file)
+  #Grab the data
+  af_data  = c((AF[[i]]))
+  hist(unlist(af_data))
+  #Plot QQ plot compared to uniform
+  # qqplot(randu$x*100,unlist(af_data),
+  #        xlab = sprintf("", strsplit(paired_values, "_")[[i]][1]),
+  #        ylab = sprintf("", strsplit(paired_values, "_")[[i]][2]))
+  # abline(0,1)
 }
 
+par(mfrow = c(4, 4))
+#Plot AFs
+for (i in 1:length(paired_values)) {
+  #Read in file
+  file = sprintf("results/pop_split/%s_split_LD_pooled_quantile_counts.RData",paired_values[i])
+  print(file)
+  #Grab data and clean
+  LD[[i]] = readRDS(file)
+  ld_data  = unlist(LD[[i]])
+  ld_data  = ld_data[!is.na(ld_data)]
+  #Plot QQ plot compared to uniform
+  qqplot(randu$x*100,unlist(ld_data),
+  xlab = "",
+  ylab = "")
+abline(0,1)
+}

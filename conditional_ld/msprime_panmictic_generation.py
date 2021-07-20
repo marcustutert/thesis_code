@@ -13,7 +13,7 @@ from itertools import product
 from random import sample 
 
 #Snakemake params
-divergence_time    = 0
+divergence_time    = int(snakemake.params[0])
 recombination_rate = snakemake.params[1]
 
 ####Variables#### 
@@ -23,7 +23,7 @@ Ne_B               = Ne_A/2
 peripheral_pops    = 500
 ###################
 
-for i in range(1,1000):
+for i in range(1,2):
   demography = msprime.Demography()
   descendant_pops = []
   demography.add_population(name="ancestral_population", initial_size=Ne_A)
@@ -37,7 +37,8 @@ for i in range(1,1000):
   sample_sizes = { k : 500 for k in descendant_pops }
   
   #Do a recombination map with a single recombination hotspot in the middle
-  rate_map = msprime.RateMap(position=[0, sequence_length / 2 - 1, sequence_length / 2, sequence_length],rate=[0,recombination_rate, 0])
+  #rate_map = msprime.RateMap.read_hapmap(position=[0, sequence_length / 2 - 1, sequence_length / 2, sequence_length],rate=[0,recombination_rate, 0])
+  rate_map = msprime.RateMap.read_hapmap("recombination_map")
   
   tree       = msprime.sim_ancestry(recombination_rate = rate_map, 
                                     demography         = demography,
@@ -51,7 +52,8 @@ for i in range(1,1000):
   #This breakpoint occurs at math.floor(sequence_length/2)
   #Get list of the SNP positions 
   tables                      = mutated_ts.tables
-  breakpoint                  = math.floor(sequence_length/2)
+  breakpoint_1                = 500500
+  breakpoint_2                = 499500
   positions                   = tables.sites.position
   
   #Remove any SNPs that are NOT segregating in the target population
@@ -72,12 +74,12 @@ for i in range(1,1000):
   #Remove this from position vector
   positions_filtered = np.delete(positions, non_seg_variants)
   
-  before_breakpoint_filtered_positions = [x for x in list(positions_filtered) if x > breakpoint]
-  after_breakpoint_filtered_positions  = [x for x in list(positions_filtered) if x < breakpoint]
+  before_breakpoint_filtered_positions = [x for x in list(positions_filtered) if x > breakpoint_1]
+  after_breakpoint_filtered_positions  = [x for x in list(positions_filtered) if x < breakpoint_2]
   
   #Randomly choose a SNP in each region (before & after)
   snp_1_index = np.random.choice(before_breakpoint_filtered_positions,1)
-  snp_2_index = np.random.choice(before_breakpoint_filtered_positions,1)
+  snp_2_index = np.random.choice(after_breakpoint_filtered_positions,1)
   
   #Look back in original positions array to see which this is
   snp_1_position = list(np.where(positions == snp_1_index)[0])[0]

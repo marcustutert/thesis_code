@@ -19,7 +19,7 @@ Each of the column plots will correspond to the common vs the rare variants, and
 
 ```{r, Signal True}
 divergence_time      = c("0","10","50","125")
-nRegions             = 99#Grab this from snakemake file
+nRegions             = 999#Grab this from snakemake file
 data_length          = nRegions * length(divergence_time)#Grab this from snakemake file
 
 ### COMMON VARIANTS ###
@@ -49,7 +49,7 @@ for (i in 1:length(divergence_time)) {
 
 #Reshape the data
 results =  cbind(ref_results,gwas_results)
-colnames(results)[5] = "GWAS LD"
+colnames(results)[5] = "GWAS"
 ##Reshape the data table
 reshaped_results <- melt(data = results, variable.name = "divergence_time")
 
@@ -112,7 +112,7 @@ for (i in 1:length(divergence_time)) {
 
 #Reshape the data
 results =  cbind(ref_results,gwas_results)
-colnames(results)[5] = "GWAS LD"
+colnames(results)[5] = "GWAS"
 results =  cbind(ref_results,gwas_results)
 ##Reshape the data table
 reshaped_results_rare <- melt(data = results, variable.name = "divergence_time")
