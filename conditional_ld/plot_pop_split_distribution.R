@@ -56,14 +56,13 @@ m <- list ( l = 50, r = 50, b = 100, t = 100, pad = 4 )
 fig %>% layout(margin = m)
 fig
 #####Plot the conditional distributions (each point in the graph above)
+nha
 #Do this across three divergence times (so again plotting 3 graphs with 3 traces per graph) and only one single recombination value (1e-8)
-
-
-values = c(7,8,9)
+values = c(1,2,3)
 #First Divergence time
-rep_1_dt_10 = list.files(path = "pop_split_msprime", pattern = sprintf("peripheral_\\d+_replicate_%s_dt_10_recomb_1e-5.csv",values[[1]]), full.names = T)
-rep_2_dt_10 = list.files(path = "pop_split_msprime", pattern = sprintf("peripheral_\\d+_replicate_%s_dt_10_recomb_1e-5.csv",values[[2]]), full.names = T)
-rep_3_dt_10 = list.files(path = "pop_split_msprime", pattern = sprintf("peripheral_\\d+_replicate_%s_dt_10_recomb_1e-5.csv",values[[3]]), full.names = T)
+rep_1_dt_10 = list.files(path = "pop_split_msprime", pattern = sprintf("peripheral_\\d+_replicate_%s_dt_10_recomb_1e-8.csv",values[1]), full.names = T)
+rep_2_dt_10 = list.files(path = "pop_split_msprime", pattern = sprintf("peripheral_\\d+_replicate_%s_dt_10_recomb_1e-8.csv",values[2]), full.names = T)
+rep_3_dt_10 = list.files(path = "pop_split_msprime", pattern = sprintf("peripheral_\\d+_replicate_%s_dt_10_recomb_1e-8.csv",values[3]), full.names = T)
 
 ld                       = lapply(rep_1_dt_10,fread,header = T)
 peripheral_array          = array(unlist(ld),dim = c(nhaps_target,2,peripheral_pop)) 
@@ -100,14 +99,14 @@ for (j in 1:length(ld_cor_peripheral_matrix)) {
 
 density3 = density(ld_peripheral_values,na.rm = T)
 
-fig_1 <- plot_ly(data = iris, x = ~density1$x, y = ~density1$y, type = 'scatter', mode = 'lines', name = signif(unlist(gm_snp[[7]][values[1]]),3), fill = 'tozeroy')
-fig_1 <- fig_1 %>% add_trace(x = ~density2$x, y = ~density2$y, name = signif(unlist(gm_snp[[7]][values[2]]),3), fill = 'tozeroy')
-fig_1 <- fig_1 %>% add_trace(x = ~density3$x, y = ~density3$y, name = signif(unlist(gm_snp[[7]][values[3]]),3), fill = 'tozeroy')
+fig_1 <- plot_ly(data = iris, x = ~density1$x, y = ~density1$y, type = 'scatter', mode = 'lines', name = signif(unlist(gm_snp[[1]][values[1]]),3), fill = 'tozeroy')
+fig_1 <- fig_1 %>% add_trace(x = ~density2$x, y = ~density2$y, name = signif(unlist(gm_snp[[2]][values[2]]),3), fill = 'tozeroy')
+fig_1 <- fig_1 %>% add_trace(x = ~density3$x, y = ~density3$y, name = signif(unlist(gm_snp[[3]][values[1]]),3), fill = 'tozeroy')
 
 #Now repeat for divergence time 20
-rep_1_dt_20 = list.files(path = "pop_split_msprime", pattern = sprintf("peripheral_\\d+_replicate_%s_dt_20_recomb_1e-5.csv",values[[1]]), full.names = T)
-rep_2_dt_20 = list.files(path = "pop_split_msprime", pattern = sprintf("peripheral_\\d+_replicate_%s_dt_20_recomb_1e-5.csv",values[[2]]), full.names = T)
-rep_3_dt_20 = list.files(path = "pop_split_msprime", pattern = sprintf("peripheral_\\d+_replicate_%s_dt_20_recomb_1e-5.csv",values[[3]]), full.names = T)
+rep_1_dt_20 = list.files(path = "pop_split_msprime", pattern = sprintf("peripheral_\\d+_replicate_%s_dt_20_recomb_1e-8.csv",values[[1]]), full.names = T)
+rep_2_dt_20 = list.files(path = "pop_split_msprime", pattern = sprintf("peripheral_\\d+_replicate_%s_dt_20_recomb_1e-8.csv",values[[2]]), full.names = T)
+rep_3_dt_20 = list.files(path = "pop_split_msprime", pattern = sprintf("peripheral_\\d+_replicate_%s_dt_20_recomb_1e-8.csv",values[[3]]), full.names = T)
 
 ld                       = lapply(rep_1_dt_20,fread,header = T)
 peripheral_array          = array(unlist(ld),dim = c(nhaps_target,2,peripheral_pop)) 
@@ -145,14 +144,14 @@ for (j in 1:length(ld_cor_peripheral_matrix)) {
 
 density3_20 = density(ld_peripheral_values,na.rm = T)
 
-fig_2 <- plot_ly(data = iris,x = ~density1_20$x, y = ~density1_20$y, type = 'scatter', mode = 'lines', name = signif(unlist(gm_snp[[8]][values[1]]),3), fill = 'tozeroy')
-fig_2 <- fig_2 %>% add_trace(x = ~density2_20$x, y = ~density2_20$y, name = signif(unlist(gm_snp[[8]][values[2]]),3), fill = 'tozeroy')
-fig_2 <- fig_2 %>% add_trace(x = ~density3_20$x, y = ~density3_20$y, name = signif(unlist(gm_snp[[8]][values[3]]),3), fill = 'tozeroy')
+fig_2 <- plot_ly(data = iris,x = ~density1_20$x, y = ~density1_20$y, type = 'scatter', mode = 'lines', name = signif(unlist(gm_snp[[1]][values[1]]),3), fill = 'tozeroy')
+fig_2 <- fig_2 %>% add_trace(x = ~density2_20$x, y = ~density2_20$y, name = signif(unlist(gm_snp[[2]][values[2]]),3), fill = 'tozeroy')
+fig_2 <- fig_2 %>% add_trace(x = ~density3_20$x, y = ~density3_20$y, name = signif(unlist(gm_snp[[3]][values[1]]),3), fill = 'tozeroy')
 
 #Third Divergence time
-rep_1_dt_50 = list.files(path = "pop_split_msprime", pattern = sprintf("peripheral_\\d+_replicate_%s_dt_50_recomb_1e-5.csv",values[[1]]), full.names = T)
-rep_2_dt_50 = list.files(path = "pop_split_msprime", pattern = sprintf("peripheral_\\d+_replicate_%s_dt_50_recomb_1e-5.csv",values[[2]]), full.names = T)
-rep_3_dt_50 = list.files(path = "pop_split_msprime", pattern = sprintf("peripheral_\\d+_replicate_%s_dt_50_recomb_1e-5.csv",values[[3]]), full.names = T)
+rep_1_dt_50 = list.files(path = "pop_split_msprime", pattern = sprintf("peripheral_\\d+_replicate_%s_dt_50_recomb_1e-8.csv",values[[1]]), full.names = T)
+rep_2_dt_50 = list.files(path = "pop_split_msprime", pattern = sprintf("peripheral_\\d+_replicate_%s_dt_50_recomb_1e-8.csv",values[[2]]), full.names = T)
+rep_3_dt_50 = list.files(path = "pop_split_msprime", pattern = sprintf("peripheral_\\d+_replicate_%s_dt_50_recomb_1e-8.csv",values[[3]]), full.names = T)
 
 ld                       = lapply(rep_1_dt_50,fread,header = T)
 peripheral_array          = array(unlist(ld),dim = c(nhaps_target,2,peripheral_pop)) 
@@ -190,9 +189,9 @@ for (j in 1:length(ld_cor_peripheral_matrix)) {
 
 density3_50 = density(ld_peripheral_values,na.rm = T)
 fig_3 <- plot_ly()
-fig_3 <- plot_ly(x = ~density1_50$x, y = ~density1_50$y, type = 'scatter', mode = 'lines', name = signif(unlist(gm_snp[[9]][values[1]]),2), fill = 'tozeroy')
-fig_3 <- fig_3 %>% add_trace(x = ~density2_50$x, y = ~density2_50$y, name = signif(unlist(gm_snp[[9]][values[2]]),2), fill = 'tozeroy')
-fig_3 <- fig_3 %>% add_trace(x = ~density3_50$x, y = ~density3_50$y, name = signif(unlist(gm_snp[[9]][values[3]]),2), fill = 'tozeroy')
+fig_3 <- plot_ly(x = ~density1_50$x, y = ~density1_50$y, type = 'scatter', mode = 'lines', name = signif(unlist(gm_snp[[1]][values[1]]),2), fill = 'tozeroy')
+fig_3 <- fig_3 %>% add_trace(x = ~density2_50$x, y = ~density2_50$y, name = signif(unlist(gm_snp[[2]][values[2]]),2), fill = 'tozeroy')
+fig_3 <- fig_3 %>% add_trace(x = ~density3_50$x, y = ~density3_50$y, name = signif(unlist(gm_snp[[3]][values[1]]),2), fill = 'tozeroy')
 
 
 #Get the subplot together
